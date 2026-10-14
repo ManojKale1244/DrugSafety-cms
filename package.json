@@ -1,0 +1,39 @@
+{
+  "name": "drug-safety-cms",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Educational Drug Safety Case Management System (Pharmacovigilance Case Tracker)",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue.bold,green.bold \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
+    "build": "cd client && npm run build",
+    "lint": "concurrently \"cd server && npm run lint\" \"cd client && npm run lint\"",
+    "test": "concurrently \"cd server && npm test\" \"cd client && npm test\"",
+    "format": "prettier --write \"**/*.{js,jsx,json,css,md}\""
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.1",
+    "express-rate-limit": "^7.4.1",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.8.0",
+    "morgan": "^1.10.0",
+    "pino": "^9.5.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "prettier": "^3.3.3"
+  }
+}

@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base resets & defaults ─────────────────────────────────── */
+@layer base {
+  :root {
+    --color-bg: 255 255 255;
+    --color-fg: 15 23 42;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-white text-slate-900 font-sans;
+    min-height: 100dvh;
+  }
+
+  /* Visible focus rings for keyboard accessibility */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-500 rounded-sm;
+  }
+}
+
+/* ── Reusable component classes ─────────────────────────────── */
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2
+           rounded-lg bg-brand-600 px-4 py-2.5
+           text-sm font-semibold text-white
+           shadow-sm transition-all duration-150
+           hover:bg-brand-700 hover:shadow-md
+           focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2
+           rounded-lg border border-surface-border bg-white px-4 py-2.5
+           text-sm font-semibold text-slate-700
+           shadow-sm transition-all duration-150
+           hover:bg-surface-subtle hover:shadow-md
+           focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .card {
+    @apply rounded-xl border border-surface-border bg-white
+           shadow-card transition-shadow duration-200
+           hover:shadow-card-hover;
+  }
+
+  .input-field {
+    @apply block w-full rounded-lg border border-surface-border bg-white
+           px-3.5 py-2.5 text-sm text-slate-900
+           placeholder:text-slate-400
+           transition-colors duration-150
+           focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none
+           disabled:bg-surface-subtle disabled:cursor-not-allowed;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5
+           text-xs font-medium ring-1 ring-inset;
+  }
+
+  .badge-new      { @apply bg-indigo-50  text-indigo-700  ring-indigo-600/20; }
+  .badge-open     { @apply bg-blue-50    text-blue-700    ring-blue-600/20; }
+  .badge-review   { @apply bg-amber-50   text-amber-700   ring-amber-600/20; }
+  .badge-closed   { @apply bg-emerald-50 text-emerald-700 ring-emerald-600/20; }
+  .badge-archived { @apply bg-gray-50    text-gray-600    ring-gray-500/20; }
+  .badge-overdue  { @apply bg-red-50     text-red-700     ring-red-600/20; }
+}
+
+/* ── Utility additions ──────────────────────────────────────── */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
