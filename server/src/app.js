@@ -5,9 +5,13 @@ import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 
+import mongoose from 'mongoose';
 import { config } from './config/index.js';
 import { mountRoutes } from './routes/index.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { Role } from './models/Role.js';
+import { seedDatabase } from './seeds/seed.js';
+import { logger } from './utils/logger.js';
 
 const app = express();
 
@@ -64,6 +68,77 @@ app.use(cookieParser());
 if (!config.isProduction) {
   app.use(morgan('dev'));
 }
+
+// ── Ensure MongoDB Connection (required for Vercel Serverless / Service runs) ──
+let isConnected = false;
+let isConnecting = false;
+
+async function ensureDatabaseConnected() {
+  if (isConnected && mongoose.connection.readyState === 1) {
+    return;
+  }
+
+  if (mongoose.connection.readyState === 1) {
+    isConnected = true;
+    return;
+  }
+
+  if (isConnecting) {
+    for (let i = 0; i < 25; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      if (mongoose.connection.readyState === 1) {
+        isConnected = true;
+        return;
+      }
+    }
+  }
+
+  isConnecting = true;
+  try {
+    const uri = config.mongoUri;
+    if (!uri) {
+      throw new Error('MONGO_URI is missing from environment variables.');
+    }
+
+    await mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 8000,
+    });
+    isConnected = true;
+    isConnecting = false;
+    logger.info('✓ MongoDB connected successfully via request middleware');
+
+    // Auto-seed if database is empty
+    try {
+      const roleCount = await Role.countDocuments();
+      if (roleCount === 0) {
+        await seedDatabase();
+      }
+    } catch (seedErr) {
+      logger.warn({ seedErr }, 'Auto-seed check notice');
+    }
+  } catch (err) {
+    isConnecting = false;
+    throw err;
+  }
+}
+
+app.use(async (req, res, next) => {
+  // Always allow health checks through even if DB is reconnecting
+  if (req.path === '/api/health' || req.path === '/health') {
+    return next();
+  }
+
+  try {
+    await ensureDatabaseConnected();
+    next();
+  } catch (err) {
+    logger.error({ err }, 'MongoDB connection error during request');
+    return res.status(503).json({
+      success: false,
+      error: `Database connection failed: ${err.message}. Please verify your MongoDB Atlas credentials and ensure Atlas Network Access allows 0.0.0.0/0.`,
+    });
+  }
+});
 
 // ── API Routes ────────────────────────────────────────────────
 mountRoutes(app);
