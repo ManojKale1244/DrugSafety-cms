@@ -22,4 +22,5 @@ export function mountRoutes(app) {
   api.use('/cases', caseRouter);
 
   app.use('/api', api);
+  app.use('/', api);
 }
