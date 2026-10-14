@@ -23,8 +23,9 @@ coverage/
 .DS_Store
 Thumbs.db
 
-# IDE
+# IDE & Deployments
 .vscode/
 .idea/
 *.swp
 *.swo
+.vercel/
