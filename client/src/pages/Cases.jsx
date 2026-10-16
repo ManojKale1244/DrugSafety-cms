@@ -243,10 +243,10 @@ export default function Cases() {
       </div>
 
       {/* ── Search, Filters, Column Chooser & Density Toolbar ── */}
-      <div className="card p-4 space-y-3 bg-white">
+      <div className="card p-3.5 sm:p-4 space-y-3 bg-white shadow-xs">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           {/* Search Bar */}
-          <div className="relative flex-1 max-w-md">
+          <div className="relative flex-1 w-full lg:max-w-md">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
               <Search className="h-4 w-4" />
             </div>
@@ -345,7 +345,7 @@ export default function Cases() {
             </div>
 
             {/* Density Toggle */}
-            <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-0.5 text-xs">
+            <div className="hidden sm:flex items-center rounded-xl border border-slate-200 bg-slate-50 p-0.5 text-xs">
               <button
                 type="button"
                 onClick={() => setDensity('compact')}
@@ -382,7 +382,7 @@ export default function Cases() {
       </div>
 
       {/* ── Case Table ──────────────────────────────────────── */}
-      <div className="card overflow-hidden bg-white shadow-sm border border-slate-200">
+      <div className="card overflow-hidden bg-white shadow-xs border border-slate-200">
         {loading ? (
           <div className="p-12 text-center text-slate-400 space-y-3">
             <Loader2 className="mx-auto h-8 w-8 animate-spin text-brand-600" />
@@ -409,7 +409,7 @@ export default function Cases() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
@@ -568,8 +568,8 @@ export default function Cases() {
 
         {/* ── Pagination ──────────────────────────────────────── */}
         {!loading && cases.length > 0 && (
-          <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50/50 px-4 py-3 text-xs text-slate-500">
-            <div>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/50 px-4 py-3 text-xs text-slate-500">
+            <div className="text-center sm:text-left">
               Showing <span className="font-semibold text-slate-900">{cases.length}</span> of{' '}
               <span className="font-semibold text-slate-900">{totalCases}</span> total cases
             </div>
@@ -579,7 +579,8 @@ export default function Cases() {
                 type="button"
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                aria-label="Previous page"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -590,7 +591,8 @@ export default function Cases() {
                 type="button"
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                aria-label="Next page"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>

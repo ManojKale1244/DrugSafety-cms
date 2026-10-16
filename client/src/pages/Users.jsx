@@ -385,7 +385,7 @@ export default function Users() {
             <p className="mt-1 text-sm text-slate-500">Try adjusting your search criteria or role filters.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="border-b border-surface-border bg-slate-50 text-xs font-semibold uppercase text-slate-500">
                 <tr>
@@ -509,7 +509,7 @@ export default function Users() {
 
         {/* Pagination Footer */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-surface-border px-6 py-3.5 text-xs text-slate-500">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-surface-border px-4 sm:px-6 py-3.5 text-xs text-slate-500">
             <span>Page {page} of {totalPages}</span>
             <div className="flex gap-2">
               <button

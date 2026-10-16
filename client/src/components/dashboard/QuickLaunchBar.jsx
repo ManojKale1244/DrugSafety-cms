@@ -25,7 +25,7 @@ export default function QuickLaunchBar({ onNewIntake }) {
     <div className="card p-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white shadow-md border-slate-800">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         {/* Left: Quick Launch Input */}
-        <form onSubmit={handleSearchSubmit} className="flex-1 max-w-xl">
+        <form onSubmit={handleSearchSubmit} className="w-full lg:max-w-xl">
           <label htmlFor="quick-launch-input" className="sr-only">
             Case Quick Launch
           </label>
@@ -60,7 +60,7 @@ export default function QuickLaunchBar({ onNewIntake }) {
         </form>
 
         {/* Right: Quick Action Buttons */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
           <Can permission="case.create">
             <button
               type="button"

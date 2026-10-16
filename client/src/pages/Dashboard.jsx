@@ -140,16 +140,16 @@ export default function Dashboard() {
         </div>
 
         {/* Time Range Selector & Auto-Refresh Badge */}
-        <div className="flex items-center gap-3">
-          <div className="flex rounded-xl bg-slate-200/60 p-1 text-xs font-semibold">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+          <div className="flex rounded-xl bg-slate-200/70 p-1 text-xs font-semibold shadow-2xs">
             {['7d', '14d', '30d', '90d'].map((range) => (
               <button
                 key={range}
                 type="button"
                 onClick={() => setTimeRange(range)}
-                className={`rounded-lg px-3 py-1.5 transition-all ${
+                className={`rounded-lg px-2.5 sm:px-3 py-1.5 transition-all text-xs ${
                   timeRange === range
-                    ? 'bg-white text-slate-900 shadow-xs'
+                    ? 'bg-white text-slate-900 shadow-xs font-bold'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -162,11 +162,11 @@ export default function Dashboard() {
             type="button"
             onClick={() => fetchSummary(true)}
             disabled={refreshing}
-            className="btn-secondary text-xs py-2 px-3 flex items-center gap-1.5"
+            className="btn-secondary text-xs py-2 px-3 flex items-center gap-1.5 rounded-xl border-slate-200 shadow-xs"
             title="Auto-refreshes every 60s"
           >
             <RotateCcw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin text-brand-600' : ''}`} />
-            <span className="hidden sm:inline">Refresh ({secondsUntilRefresh}s)</span>
+            <span className="inline">Refresh ({secondsUntilRefresh}s)</span>
           </button>
         </div>
       </div>
