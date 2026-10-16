@@ -221,6 +221,11 @@ export default function Login() {
             ))}
           </div>
         </div>
+
+        {/* Left Panel Copyright Footer */}
+        <div className="relative z-10 pt-4 text-xs text-slate-400">
+          © {new Date().getFullYear()} Drug Safety CMS — Pharmacovigilance Platform. All rights reserved.
+        </div>
       </div>
 
       {/* ── Right: Login Form Panel ─────────────────────────── */}
@@ -367,8 +372,13 @@ export default function Login() {
             </div>
           </div>
 
-          <div className="mt-8 border-t border-slate-100 pt-6 text-center text-xs text-slate-400">
-            🔒 Protected by httpOnly secure cookie session, bcrypt 12-round hashing, and automated account lockout.
+          <div className="mt-8 border-t border-slate-100 pt-6 text-center space-y-1.5 text-xs">
+            <p className="font-medium text-slate-500">
+              © {new Date().getFullYear()} Drug Safety CMS — Pharmacovigilance Platform. All rights reserved.
+            </p>
+            <p className="text-[11px] text-slate-400">
+              🔒 Protected by httpOnly secure cookie session, bcrypt 12-round hashing, and automated account lockout.
+            </p>
           </div>
         </div>
       </div>

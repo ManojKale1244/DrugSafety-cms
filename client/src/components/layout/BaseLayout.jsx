@@ -209,6 +209,10 @@ export default function BaseLayout() {
             <LogOut className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             Sign Out
           </button>
+
+          <p className="text-[10px] text-slate-400 text-center pt-1 font-medium leading-tight">
+            © {new Date().getFullYear()} Drug Safety CMS — Pharmacovigilance Platform
+          </p>
         </div>
       </aside>
 
@@ -299,6 +303,10 @@ export default function BaseLayout() {
                   <LogOut className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   Sign Out
                 </button>
+
+                <p className="text-[10px] text-slate-400 text-center pt-1 font-medium leading-tight">
+                  © {new Date().getFullYear()} Drug Safety CMS — Pharmacovigilance Platform
+                </p>
               </div>
             </motion.aside>
           </>
