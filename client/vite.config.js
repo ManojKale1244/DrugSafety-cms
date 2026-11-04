@@ -1,10 +1,31 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import fs from 'fs';
+
+// Plugin to ensure dist/404.html is automatically generated on every build for SPA reload support on Vercel
+function copy404Plugin() {
+  return {
+    name: 'copy-404-fallback',
+    closeBundle() {
+      const dist = path.resolve(__dirname, 'dist');
+      const idx = path.join(dist, 'index.html');
+      const fallback = path.join(dist, '404.html');
+      try {
+        if (fs.existsSync(idx)) {
+          fs.copyFileSync(idx, fallback);
+          console.log('✓ SPA Fallback: Generated dist/404.html from dist/index.html');
+        }
+      } catch (err) {
+        console.warn('Notice: Could not copy 404.html:', err.message);
+      }
+    },
+  };
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), copy404Plugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
