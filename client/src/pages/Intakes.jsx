@@ -222,105 +222,188 @@ export default function Intakes() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left text-sm text-slate-600">
-              <thead className="border-b border-surface-border bg-slate-50 text-xs font-semibold uppercase text-slate-500">
-                <tr>
-                  <th scope="col" className="px-4 py-3.5">Intake #</th>
-                  <th scope="col" className="px-4 py-3.5">Receipt Date</th>
-                  <th scope="col" className="px-4 py-3.5">Suspected Product</th>
-                  <th scope="col" className="px-4 py-3.5">Reported Reaction</th>
-                  <th scope="col" className="px-4 py-3.5">Patient Ref</th>
-                  <th scope="col" className="px-4 py-3.5">Criteria</th>
-                  <th scope="col" className="px-4 py-3.5">Status</th>
-                  <th scope="col" className="px-4 py-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-surface-border">
-                {intakes.map((intake) => {
-                  const hasAllCriteria = intake.validation?.hasMinimumCriteria;
+          <>
+            {/* ── Mobile Card View (< md) ───────────────────── */}
+            <div className="divide-y divide-surface-border md:hidden">
+              {intakes.map((intake) => {
+                const hasAllCriteria = intake.validation?.hasMinimumCriteria;
 
-                  return (
-                    <tr
-                      key={intake._id}
-                      className="hover:bg-slate-50/70 transition-colors"
-                    >
-                      <td className="px-4 py-3.5 font-mono font-bold text-slate-900">
-                        <Link
-                          to={`/intakes/${intake._id}`}
-                          className="hover:text-brand-600 transition-colors flex items-center gap-1"
-                        >
-                          {intake.intakeNumber}
-                          <ExternalLink className="h-3 w-3 opacity-40" />
-                        </Link>
-                      </td>
-
-                      <td className="px-4 py-3.5 text-xs text-slate-500">
-                        {new Date(intake.receiptDate).toLocaleDateString('en-IN', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
-                      </td>
-
-                      <td className="px-4 py-3.5 font-medium text-indigo-700">
-                        {intake.suspectedProduct}
-                      </td>
-
-                      <td className="px-4 py-3.5 max-w-xs truncate" title={intake.reportedReaction}>
-                        {intake.reportedReaction}
-                      </td>
-
-                      <td className="px-4 py-3.5 text-xs font-mono text-slate-600">
-                        {intake.patient?.reference || (
-                          <span className="text-slate-400 italic">None</span>
-                        )}
-                      </td>
-
-                      <td className="px-4 py-3.5">
+                return (
+                  <div
+                    key={intake._id}
+                    className="p-4 hover:bg-slate-50/80 transition-colors space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <Link
+                        to={`/intakes/${intake._id}`}
+                        className="font-mono font-bold text-brand-600 text-sm hover:underline flex items-center gap-1"
+                      >
+                        {intake.intakeNumber}
+                        <ExternalLink className="h-3 w-3 opacity-60" />
+                      </Link>
+                      <div className="flex items-center gap-1.5">
+                        {getStatusPill(intake.status)}
                         {hasAllCriteria ? (
-                          <span className="badge bg-emerald-50 text-emerald-700 ring-emerald-600/20 font-bold flex items-center gap-1 w-fit">
+                          <span className="badge bg-emerald-50 text-emerald-700 text-[10px] font-bold ring-emerald-600/20 flex items-center gap-0.5">
                             <ShieldCheck className="h-3 w-3" />
                             Valid (4/4)
                           </span>
                         ) : (
-                          <span
-                            className="badge bg-amber-50 text-amber-700 ring-amber-600/20 font-semibold flex items-center gap-1 w-fit"
-                            title={`Missing: ${intake.validation?.missingFields?.join(', ')}`}
-                          >
+                          <span className="badge bg-amber-50 text-amber-700 text-[10px] font-semibold ring-amber-600/20 flex items-center gap-0.5">
                             <ShieldAlert className="h-3 w-3" />
-                            Missing Fields
+                            Missing
                           </span>
                         )}
-                      </td>
+                      </div>
+                    </div>
 
-                      <td className="px-4 py-3.5">
-                        {getStatusPill(intake.status)}
-                      </td>
+                    <div className="space-y-1 text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold uppercase">Suspected Product</span>
+                        <span className="font-semibold text-indigo-700">{intake.suspectedProduct}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold uppercase">Reported Reaction</span>
+                        <p className="text-slate-700 line-clamp-2">{intake.reportedReaction}</p>
+                      </div>
+                    </div>
 
-                      <td className="px-4 py-3.5 text-right space-x-1">
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1.5 border-t border-slate-100">
+                      <div>
+                        <span>Pt: <strong>{intake.patient?.reference || 'None'}</strong></span>
+                        <span className="mx-1">•</span>
+                        <span>
+                          {new Date(intake.receiptDate).toLocaleDateString('en-IN', {
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => setPreviewIntake(intake)}
-                          className="inline-flex items-center gap-1 rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-                          title="Quick Preview"
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-slate-600 hover:bg-slate-100"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-3.5 w-3.5" />
+                          <span>Preview</span>
                         </button>
 
                         <Link
                           to={`/intakes/${intake._id}`}
-                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-brand-600 hover:bg-brand-50 transition-colors"
+                          className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold text-brand-600 hover:bg-brand-50"
                         >
                           Open View
                         </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* ── Desktop Table (md+) ──────────────────────── */}
+            <div className="hidden md:block overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left text-sm text-slate-600">
+                <thead className="border-b border-surface-border bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+                  <tr>
+                    <th scope="col" className="px-4 py-3.5">Intake #</th>
+                    <th scope="col" className="px-4 py-3.5">Receipt Date</th>
+                    <th scope="col" className="px-4 py-3.5">Suspected Product</th>
+                    <th scope="col" className="px-4 py-3.5">Reported Reaction</th>
+                    <th scope="col" className="px-4 py-3.5">Patient Ref</th>
+                    <th scope="col" className="px-4 py-3.5">Criteria</th>
+                    <th scope="col" className="px-4 py-3.5">Status</th>
+                    <th scope="col" className="px-4 py-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-surface-border">
+                  {intakes.map((intake) => {
+                    const hasAllCriteria = intake.validation?.hasMinimumCriteria;
+
+                    return (
+                      <tr
+                        key={intake._id}
+                        className="hover:bg-slate-50/70 transition-colors"
+                      >
+                        <td className="px-4 py-3.5 font-mono font-bold text-slate-900">
+                          <Link
+                            to={`/intakes/${intake._id}`}
+                            className="hover:text-brand-600 transition-colors flex items-center gap-1"
+                          >
+                            {intake.intakeNumber}
+                            <ExternalLink className="h-3 w-3 opacity-40" />
+                          </Link>
+                        </td>
+
+                        <td className="px-4 py-3.5 text-xs text-slate-500">
+                          {new Date(intake.receiptDate).toLocaleDateString('en-IN', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
+                        </td>
+
+                        <td className="px-4 py-3.5 font-medium text-indigo-700">
+                          {intake.suspectedProduct}
+                        </td>
+
+                        <td className="px-4 py-3.5 max-w-xs truncate" title={intake.reportedReaction}>
+                          {intake.reportedReaction}
+                        </td>
+
+                        <td className="px-4 py-3.5 text-xs font-mono text-slate-600">
+                          {intake.patient?.reference || (
+                            <span className="text-slate-400 italic">None</span>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3.5">
+                          {hasAllCriteria ? (
+                            <span className="badge bg-emerald-50 text-emerald-700 ring-emerald-600/20 font-bold flex items-center gap-1 w-fit">
+                              <ShieldCheck className="h-3 w-3" />
+                              Valid (4/4)
+                            </span>
+                          ) : (
+                            <span
+                              className="badge bg-amber-50 text-amber-700 ring-amber-600/20 font-semibold flex items-center gap-1 w-fit"
+                              title={`Missing: ${intake.validation?.missingFields?.join(', ')}`}
+                            >
+                              <ShieldAlert className="h-3 w-3" />
+                              Missing Fields
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-3.5">
+                          {getStatusPill(intake.status)}
+                        </td>
+
+                        <td className="px-4 py-3.5 text-right space-x-1">
+                          <button
+                            type="button"
+                            onClick={() => setPreviewIntake(intake)}
+                            className="inline-flex items-center gap-1 rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                            title="Quick Preview"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+
+                          <Link
+                            to={`/intakes/${intake._id}`}
+                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-brand-600 hover:bg-brand-50 transition-colors"
+                          >
+                            Open View
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {/* Pagination Footer */}

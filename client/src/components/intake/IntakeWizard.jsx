@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FileText,
@@ -12,6 +12,8 @@ import {
   Save,
   AlertCircle,
   Upload,
+  UploadCloud,
+  Plus,
   X,
   Loader2,
 } from 'lucide-react';
@@ -47,6 +49,12 @@ export default function IntakeWizard({ onSuccess, onCancel }) {
   const [submitError, setSubmitError] = useState('');
   const [duplicates, setDuplicates] = useState([]);
   const [duplicateLoading, setDuplicateLoading] = useState(false);
+
+  // File Upload State
+  const fileInputRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [fileError, setFileError] = useState('');
+  const [realFiles, setRealFiles] = useState([]);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -119,25 +127,66 @@ export default function IntakeWizard({ onSuccess, onCancel }) {
     });
   };
 
-  // Add dummy attachment
-  const handleAddAttachment = () => {
-    const docName = `Source_Lab_Report_${Date.now().toString().slice(-4)}.pdf`;
-    setFormData((prev) => {
-      const updated = {
-        ...prev,
-        attachments: [
-          ...prev.attachments,
-          {
-            name: docName,
-            url: '#',
-            size: Math.floor(Math.random() * 400 + 100) * 1024,
-            uploadedAt: new Date().toISOString(),
-          },
-        ],
-      };
-      saveDraft(updated);
-      return updated;
-    });
+  // Handle Real File Selection
+  const handleFilesSelected = (filesList) => {
+    setFileError('');
+    if (!filesList || filesList.length === 0) return;
+    const newFiles = Array.from(filesList);
+    const validMeta = [];
+    const validRealFiles = [];
+
+    for (const file of newFiles) {
+      if (file.size > 25 * 1024 * 1024) {
+        setFileError(`File "${file.name}" exceeds the maximum statutory limit of 25MB.`);
+        continue;
+      }
+      validMeta.push({
+        name: file.name,
+        size: file.size,
+        type: file.type || 'application/octet-stream',
+        uploadedAt: new Date().toISOString(),
+      });
+      validRealFiles.push(file);
+    }
+
+    if (validMeta.length > 0) {
+      setRealFiles((prev) => [...prev, ...validRealFiles]);
+      setFormData((prev) => {
+        const updated = {
+          ...prev,
+          attachments: [...prev.attachments, ...validMeta],
+        };
+        saveDraft(updated);
+        return updated;
+      });
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFilesSelected(e.dataTransfer.files);
+    }
+  };
+
+  // Add dummy/sample attachment for testing
+  const handleAddSampleAttachment = () => {
+    const randomId = Date.now().toString().slice(-4);
+    const sampleFileName = `Sample_Discharge_Lab_Report_${randomId}.pdf`;
+    const sampleContent = `%PDF-1.4\n% Sample Clinical Lab Report for Adverse Event Intake (${randomId})\nPatient: Anonymized\nProduct: NeuroCalm\nObservation: Elevated liver transaminases.\n%%EOF`;
+    const sampleFile = new File([sampleContent], sampleFileName, { type: 'application/pdf' });
+    handleFilesSelected([sampleFile]);
   };
 
   const handleRemoveAttachment = (idx) => {
@@ -149,10 +198,23 @@ export default function IntakeWizard({ onSuccess, onCancel }) {
       saveDraft(updated);
       return updated;
     });
+    setRealFiles((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const isReceiptDateFuture = () => {
+    if (!formData.receiptDate) return false;
+    const selected = new Date(formData.receiptDate).setHours(0, 0, 0, 0);
+    const today = new Date().setHours(23, 59, 59, 999);
+    return selected > today;
   };
 
   // When stepping into Review Step, screen for duplicates
   const handleNext = () => {
+    if (currentStep === 1 && isReceiptDateFuture()) {
+      setSubmitError(`Receipt date cannot be set in the future (${formData.receiptDate}). Please select today or an earlier date.`);
+      return;
+    }
+    setSubmitError('');
     if (currentStep === 5) {
       // Fetch duplicate screening preview
       runDuplicateScreening();
@@ -197,6 +259,12 @@ export default function IntakeWizard({ onSuccess, onCancel }) {
     setSubmitting(true);
     setSubmitError('');
 
+    if (isReceiptDateFuture()) {
+      setSubmitError(`Receipt date cannot be set in the future (${formData.receiptDate}). Please return to Step 1 and select today or an earlier date.`);
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const effectiveProduct =
         formData.suspectedProduct === 'Other Fictional Product'
@@ -205,35 +273,67 @@ export default function IntakeWizard({ onSuccess, onCancel }) {
 
       const payload = {
         source: formData.source,
-        receiptDate: new Date(formData.receiptDate).toISOString(),
+        receiptDate: formData.receiptDate
+          ? new Date(formData.receiptDate).toISOString()
+          : new Date().toISOString(),
         reporter: {
-          name: formData.reporter.name.trim(),
-          qualification: formData.reporter.qualification,
-          contact: formData.reporter.contact.trim(),
-          country: formData.reporter.country.trim(),
+          name: (formData.reporter?.name || '').trim(),
+          qualification: formData.reporter?.qualification || 'Physician',
+          contact: (formData.reporter?.contact || '').trim(),
+          country: (formData.reporter?.country || 'India').trim(),
         },
         patient: {
-          reference: formData.patient.reference.trim(),
-          age: formData.patient.age ? Number(formData.patient.age) : null,
-          ageUnit: formData.patient.ageUnit,
-          sex: formData.patient.sex,
-          weight: formData.patient.weight ? Number(formData.patient.weight) : null,
+          reference: (formData.patient?.reference || '').trim(),
+          age: formData.patient?.age ? Number(formData.patient.age) : null,
+          ageUnit: formData.patient?.ageUnit || 'years',
+          sex: formData.patient?.sex || 'Unknown',
+          weight: formData.patient?.weight ? Number(formData.patient.weight) : null,
         },
         suspectedProduct: effectiveProduct,
         reportedReaction: formData.reportedReaction.trim(),
-        narrative: formData.narrative.trim(),
-        attachments: formData.attachments,
+        narrative: (formData.narrative || '').trim(),
+        attachments: (formData.attachments || []).map((att) => ({
+          name: String(att.name || 'document.pdf'),
+          url: String(att.url || ''),
+          size: Number(att.size) || 0,
+          uploadedAt: att.uploadedAt || new Date().toISOString(),
+        })),
       };
 
       const res = await api.post('/intakes', payload);
       if (res.data.success) {
+        const createdIntake = res.data.intake;
+
+        // Upload real files to the document vault for this intake
+        if (realFiles.length > 0) {
+          for (const file of realFiles) {
+            try {
+              const formDataObj = new FormData();
+              formDataObj.append('file', file);
+              formDataObj.append('category', 'SOURCE_DOCUMENT');
+              await api.post(`/intakes/${createdIntake._id}/attachments`, formDataObj, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+              });
+            } catch (uploadErr) {
+              console.error('Failed to upload attachment file to vault:', uploadErr);
+            }
+          }
+        }
+
         localStorage.removeItem(STORAGE_KEY);
         if (onSuccess) {
-          onSuccess(res.data.intake);
+          onSuccess(createdIntake);
         }
       }
     } catch (err) {
-      setSubmitError(err.response?.data?.error || 'Failed to submit intake record');
+      console.error('Intake submission error:', err);
+      const detailedError =
+        err.response?.data?.issues?.map((i) => i.message).join(', ') ||
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        err.message ||
+        'Failed to submit intake record';
+      setSubmitError(detailedError);
     } finally {
       setSubmitting(false);
     }
@@ -339,12 +439,22 @@ export default function IntakeWizard({ onSuccess, onCancel }) {
                         type="date"
                         max={new Date().toISOString().split('T')[0]}
                         value={formData.receiptDate}
-                        onChange={(e) => updateField(null, 'receiptDate', e.target.value)}
-                        className="input-field"
+                        onChange={(e) => {
+                          updateField(null, 'receiptDate', e.target.value);
+                          setSubmitError('');
+                        }}
+                        className={`input-field ${isReceiptDateFuture() ? 'border-rose-500 ring-1 ring-rose-500 bg-rose-50/30' : ''}`}
                       />
-                      <p className="mt-1 text-[11px] text-slate-400">
-                        Date report first arrived in company possession (Day 0)
-                      </p>
+                      {isReceiptDateFuture() ? (
+                        <p className="mt-1 text-xs text-rose-600 font-semibold flex items-center gap-1">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          Receipt date cannot be set in the future ({formData.receiptDate}).
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-[11px] text-slate-400">
+                          Date report first arrived in company possession (Day 0)
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -583,54 +693,130 @@ export default function IntakeWizard({ onSuccess, onCancel }) {
                   <div>
                     <h3 className="font-bold text-slate-900 text-lg">Source Documents & Attachments</h3>
                     <p className="text-xs text-slate-500">
-                      Attach intake hospital discharge summaries, lab reports, or source emails
+                      Attach clinical discharge summaries, laboratory profiles, hospital records, or ICSR source emails
                     </p>
                   </div>
 
-                  <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-6 text-center">
-                    <Upload className="mx-auto h-8 w-8 text-slate-400 mb-2" />
-                    <p className="text-xs font-semibold text-slate-700">Simulate Document Attachment</p>
-                    <p className="text-[11px] text-slate-400 mt-1 mb-3">
-                      Add dummy PDFs or lab records to link with this intake
+                  {fileError && (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                        <span>{fileError}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFileError('')}
+                        className="text-rose-500 hover:text-rose-700"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Hidden real file input */}
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    multiple
+                    onChange={(e) => {
+                      handleFilesSelected(e.target.files);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                    accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xml,.json,.csv,.txt"
+                    className="hidden"
+                  />
+
+                  {/* Drag & Drop Box with Browse / Choose File Button */}
+                  <div
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    className={`rounded-2xl border-2 border-dashed p-7 text-center transition-all ${
+                      isDragging
+                        ? 'border-brand-500 bg-brand-50/70 scale-[1.01]'
+                        : 'border-slate-300 bg-slate-50/60 hover:border-brand-400 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-brand-100 text-brand-600 mb-3">
+                      <UploadCloud className="h-6 w-6" />
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-800">
+                      Drag & drop documents here, or browse from device
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-1 mb-4">
+                      Supports PDF, PNG, JPG, Word (.docx), XML, CSV (up to 25MB each)
                     </p>
-                    <button
-                      type="button"
-                      onClick={handleAddAttachment}
-                      className="btn-secondary text-xs"
-                    >
-                      <Upload className="h-3.5 w-3.5" />
-                      Add Sample Lab Report PDF
-                    </button>
+
+                    <div className="flex flex-wrap items-center justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="btn-primary text-xs py-2 px-4 shadow-sm"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        Choose Files from Device
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleAddSampleAttachment}
+                        className="btn-secondary text-xs py-2 px-3 text-slate-600 hover:text-slate-800"
+                        title="Simulate sample clinical PDF"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Add Sample Lab PDF
+                      </button>
+                    </div>
                   </div>
 
                   {formData.attachments.length > 0 && (
-                    <div className="space-y-2">
-                      <span className="text-xs font-semibold text-slate-600 block">
-                        Linked Documents ({formData.attachments.length}):
-                      </span>
-                      {formData.attachments.map((att, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs"
+                    <div className="space-y-2 pt-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-700">
+                          Attached Documents ({formData.attachments.length})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData((prev) => ({ ...prev, attachments: [] }));
+                            setRealFiles([]);
+                          }}
+                          className="text-[11px] text-rose-600 hover:underline"
                         >
-                          <div className="flex items-center gap-2.5">
-                            <Paperclip className="h-4 w-4 text-brand-600" />
-                            <div>
-                              <span className="font-semibold text-slate-800">{att.name}</span>
-                              <span className="text-[10px] text-slate-400 block">
-                                {(att.size / 1024).toFixed(1)} KB • Attached just now
-                              </span>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveAttachment(i)}
-                            className="text-slate-400 hover:text-red-600 p-1 rounded"
+                          Clear all
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        {formData.attachments.map((att, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 text-xs shadow-2xs hover:border-brand-200 transition-colors"
                           >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="p-2 bg-brand-50 rounded-lg text-brand-600 shrink-0">
+                                <FileText className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <span className="font-semibold text-slate-800 block truncate" title={att.name}>
+                                  {att.name}
+                                </span>
+                                <span className="text-[11px] text-slate-400 block">
+                                  {(att.size / 1024).toFixed(1)} KB • Ready for upload & audit
+                                </span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveAttachment(i)}
+                              className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                              title="Remove attachment"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -650,8 +836,13 @@ export default function IntakeWizard({ onSuccess, onCancel }) {
                   <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 text-xs space-y-2.5">
                     <div className="flex justify-between border-b border-slate-200/60 pb-2">
                       <span className="text-slate-500 font-medium">Source & Date:</span>
-                      <span className="font-semibold text-slate-900 capitalize">
+                      <span className="font-semibold text-slate-900 capitalize flex items-center gap-1.5">
                         {formData.source} • {formData.receiptDate}
+                        {isReceiptDateFuture() && (
+                          <span className="text-[10px] text-rose-600 font-bold bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                            Future Date Invalid
+                          </span>
+                        )}
                       </span>
                     </div>
                     <div className="flex justify-between border-b border-slate-200/60 pb-2">
@@ -717,9 +908,12 @@ export default function IntakeWizard({ onSuccess, onCancel }) {
                   </div>
 
                   {submitError && (
-                    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800 flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4 shrink-0" />
-                      <span>{submitError}</span>
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800 flex items-start gap-2.5">
+                      <AlertCircle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
+                      <div>
+                        <span className="font-bold block">Validation Error:</span>
+                        <span>{submitError}</span>
+                      </div>
                     </div>
                   )}
                 </div>

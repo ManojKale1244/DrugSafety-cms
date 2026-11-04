@@ -23,6 +23,10 @@ import {
   HelpCircle,
   ChevronRight,
   Loader2,
+  Check,
+  GitCommit,
+  ShieldCheck,
+  FileCode,
 } from 'lucide-react';
 import api from '../services/api';
 import DataOriginBadge from '../components/case/DataOriginBadge';
@@ -30,6 +34,18 @@ import ChangeReasonModal from '../components/case/ChangeReasonModal';
 import ConflictModal from '../components/case/ConflictModal';
 import CloseCaseModal from '../components/case/CloseCaseModal';
 import AssignCaseModal from '../components/case/AssignCaseModal';
+import MedicalCodingPanel from '../components/case/MedicalCodingPanel';
+import MedicalReviewWorkspace from '../components/case/MedicalReviewWorkspace';
+import QualityReviewWorkspace from '../components/quality/QualityReviewWorkspace';
+import CaseReportingTab from '../components/reporting/CaseReportingTab';
+import StageStepper from '../components/workflow/StageStepper';
+import CaseRouteModal from '../components/workflow/CaseRouteModal';
+import WorkflowHistoryTimeline from '../components/workflow/WorkflowHistoryTimeline';
+import IcsrExportModal from '../components/icsr/IcsrExportModal';
+import FollowUpTab from '../components/followup/FollowUpTab';
+import CaseAttachmentsManager from '../components/case/CaseAttachmentsManager';
+import CaseProductsEditor from '../components/case/CaseProductsEditor';
+import { formatCaseDetailsWhatsApp, openWhatsAppShare } from '../utils/whatsappFormatter';
 
 const SECTIONS = [
   { id: 'overview', label: 'Overview', icon: BookOpen },
@@ -40,6 +56,7 @@ const SECTIONS = [
   { id: 'narrative', label: 'Narrative', icon: FileText },
   { id: 'assessment', label: 'Assessment', icon: Stethoscope },
   { id: 'coding', label: 'Coding (MedDRA)', icon: Sparkles },
+  { id: 'quality', label: 'Quality Review', icon: ShieldCheck },
   { id: 'documents', label: 'Documents', icon: Paperclip },
   { id: 'followups', label: 'Follow-ups', icon: HelpCircle },
   { id: 'reporting', label: 'Reporting', icon: Send },
@@ -82,11 +99,24 @@ export default function CaseDetails() {
   const [closing, setClosing] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [showRouteModal, setShowRouteModal] = useState(false);
+  const [showIcsrExportModal, setShowIcsrExportModal] = useState(false);
 
-  // Audit history state
+  // Audit and workflow history state
   const [auditHistory, setAuditHistory] = useState([]);
+  const [workflowHistory, setWorkflowHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [closureReadiness, setClosureReadiness] = useState(null);
+  const [codingSummary, setCodingSummary] = useState(null);
+
+  // Compute uncoded count
+  const uncodedReactionsCount = useMemo(() => {
+    if (codingSummary && typeof codingSummary.uncodedCount === 'number') {
+      return codingSummary.uncodedCount;
+    }
+    const reactions = formData?.reactions || caseData?.reactions || [];
+    return reactions.filter((r) => !r.pt || !r.pt.trim() || !r.meddraCode).length;
+  }, [codingSummary, formData?.reactions, caseData?.reactions]);
 
   // Fetch case details
   const fetchCase = useCallback(async () => {
@@ -98,6 +128,26 @@ export default function CaseDetails() {
         setCaseData(res.data.case);
         setFormData(JSON.parse(JSON.stringify(res.data.case)));
         setClosureReadiness(res.data.closureReadiness);
+      }
+
+      // Also fetch medical coding status overview
+      try {
+        const codingRes = await api.get(`/cases/${caseId}/coding`);
+        if (codingRes.data.success) {
+          setCodingSummary(codingRes.data);
+        }
+      } catch (_cErr) {
+        // Fallback handled by reactions array
+      }
+
+      // Fetch workflow details and transition history (Module 8)
+      try {
+        const wfRes = await api.get(`/cases/${caseId}/workflow`);
+        if (wfRes.data.success) {
+          setWorkflowHistory(wfRes.data.history || []);
+        }
+      } catch (_wErr) {
+        // Handled gracefully
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load case record');
@@ -177,6 +227,27 @@ export default function CaseDetails() {
     e?.preventDefault();
     if (!isDirty) return;
 
+    // Workflow gate: Cannot advance workflow past coding while reactions are uncoded
+    const postCodingStatuses = [
+      'medical_review',
+      'quality_review',
+      'ready_for_submission',
+      'submitted',
+      'completed',
+      'closed',
+    ];
+    if (
+      formData.status !== caseData.status &&
+      postCodingStatuses.includes(formData.status) &&
+      uncodedReactionsCount > 0
+    ) {
+      setError(
+        `Workflow advancement blocked: Cannot advance case to "${formData.status}" while ${uncodedReactionsCount} reaction(s) remain uncoded. Complete MedDRA coding first.`
+      );
+      setActiveSection('coding');
+      return;
+    }
+
     const sensitive = getSensitiveChanges();
     if (sensitive.length > 0) {
       setShowChangeReasonModal(true);
@@ -255,29 +326,11 @@ export default function CaseDetails() {
     }
   };
 
-  // Share Individual Case Summary to WhatsApp
+  // Share Individual Case Summary to WhatsApp in professional executive format
   const handleShareCaseWhatsApp = () => {
     if (!caseData) return;
-    const prod = caseData.product || caseData.caseProducts?.[0]?.productName || 'N/A';
-    const reaction = caseData.eventSummary || caseData.reactions?.[0]?.verbatim || 'N/A';
-    const message = [
-      `🚨 *PHARMACOVIGILANCE CASE REPORT: ${caseData.caseNumber}* 🚨`,
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-      `💊 *Suspected Product:* ${prod}`,
-      `⚡ *Adverse Reaction:* ${reaction}`,
-      `⚠️ *Seriousness:* ${caseData.seriousness || 'N/A'}`,
-      `🔥 *Priority:* ${(caseData.priority || 'medium').toUpperCase()}`,
-      `📌 *Status:* ${(caseData.status || '').replace(/_/g, ' ').toUpperCase()}`,
-      `👤 *Assignee:* ${caseData.assignedTo?.name || 'Unassigned'}`,
-      `📅 *Report Date:* ${new Date(caseData.receiptDate).toLocaleDateString()}`,
-      caseData.regulatoryDueDate ? `⏰ *Regulatory Due:* ${new Date(caseData.regulatoryDueDate).toLocaleDateString()}` : '',
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-      `🔗 *Review Case:* ${window.location.origin}/cases/${caseData.caseNumber}`,
-      `🔒 _Confidential — Regulated Safety Data_`,
-    ].filter(Boolean).join('\n');
-
-    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+    const message = formatCaseDetailsWhatsApp(caseData);
+    openWhatsAppShare(message);
   };
 
   if (loading) {
@@ -360,11 +413,11 @@ export default function CaseDetails() {
       </div>
 
       {/* ── Sticky Case Workspace Header ────────────────────── */}
-      <div className="sticky top-0 z-20 rounded-2xl bg-white/95 backdrop-blur-md p-4 sm:p-5 shadow-sm border border-slate-200/90 space-y-3">
+      <div className="rounded-2xl bg-white/95 backdrop-blur-md p-4 sm:p-5 shadow-sm border border-slate-200/90 space-y-3 lg:sticky lg:top-0 lg:z-20">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           {/* Left: Case Identity & Status Pills */}
           <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
               <span className="font-mono text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
                 {caseData.caseNumber}
               </span>
@@ -397,9 +450,9 @@ export default function CaseDetails() {
             </div>
 
             {/* Sub-bar: Elapsed Age Clock & Assignee */}
-            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-slate-500">
               <div className="flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5 text-slate-400" />
+                <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                 <span>
                   Received {new Date(caseData.receiptDate).toLocaleDateString()}
                 </span>
@@ -407,14 +460,14 @@ export default function CaseDetails() {
 
               {caseData.regulatoryDueDate && (
                 <div className="flex items-center gap-1.5 text-amber-700 font-medium">
-                  <Calendar className="h-3.5 w-3.5" />
+                  <Calendar className="h-3.5 w-3.5 shrink-0" />
                   <span>Due: {new Date(caseData.regulatoryDueDate).toLocaleDateString()}</span>
                 </div>
               )}
 
               {/* Assignee Avatar */}
               <div className="flex items-center gap-1.5">
-                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-600 text-white font-bold text-[10px] uppercase">
+                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-600 text-white font-bold text-[10px] uppercase shrink-0">
                   {caseData.assignedTo?.name?.slice(0, 1) || 'U'}
                 </div>
                 <span>Assignee: <strong>{caseData.assignedTo?.name || 'Unassigned'}</strong></span>
@@ -433,13 +486,35 @@ export default function CaseDetails() {
 
           {/* Right: Action CTAs */}
           <div className="flex flex-wrap items-center gap-2">
+            {!isClosed && (
+              <button
+                type="button"
+                onClick={() => setShowRouteModal(true)}
+                className="rounded-xl border border-brand-300 bg-brand-50 px-3 py-2 text-xs font-semibold text-brand-800 hover:bg-brand-100 hover:border-brand-400 transition-all shadow-xs flex items-center gap-1.5"
+                title="Route case through workflow stages"
+              >
+                <GitCommit className="h-3.5 w-3.5 text-brand-600 shrink-0" />
+                <span>Route Case</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowIcsrExportModal(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-300 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-800 hover:bg-indigo-100 hover:border-indigo-400 transition-all shadow-xs"
+              title="Export case in synthetic ICH E2B(R3) XML/JSON format"
+            >
+              <FileCode className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+              <span>Export ICSR (E2B)</span>
+            </button>
+
             <button
               type="button"
               onClick={handleShareCaseWhatsApp}
               className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 hover:border-emerald-400 transition-all shadow-xs"
               title="Share clinical case summary to WhatsApp"
             >
-              <WhatsAppIcon className="h-3.5 w-3.5 text-emerald-600" />
+              <WhatsAppIcon className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
               <span>Share to WhatsApp</span>
             </button>
 
@@ -449,7 +524,7 @@ export default function CaseDetails() {
                   type="button"
                   onClick={handleSaveClick}
                   disabled={!isDirty || saving}
-                  className={`btn-primary text-xs py-2 px-4 shadow-sm flex items-center gap-1.5 ${
+                  className={`btn-primary text-xs py-2 px-3.5 sm:px-4 shadow-sm flex items-center gap-1.5 ${
                     !isDirty ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 >
@@ -476,6 +551,13 @@ export default function CaseDetails() {
           </div>
         </div>
 
+        {/* Visual Workflow Stage Stepper */}
+        <StageStepper
+          currentStage={caseData.status}
+          onOpenRouteModal={() => setShowRouteModal(true)}
+          readOnly={isClosed}
+        />
+
         {/* Global Error Banner */}
         {error && (
           <div className="rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700 font-medium flex items-center gap-2">
@@ -485,11 +567,45 @@ export default function CaseDetails() {
         )}
       </div>
 
+      {/* ── Mobile/Tablet Horizontal Section Navigator (< lg) ── */}
+      <div className="lg:hidden">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none">
+          {SECTIONS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setActiveSection(id)}
+              className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium whitespace-nowrap shrink-0 border transition-all ${
+                activeSection === id
+                  ? 'bg-brand-600 text-white border-brand-600 shadow-xs font-semibold'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <Icon className={`h-3.5 w-3.5 shrink-0 ${activeSection === id ? 'text-white' : 'text-slate-400'}`} />
+              <span>{label}</span>
+              {id === 'coding' && (
+                uncodedReactionsCount > 0 ? (
+                  <span
+                    className={`badge text-[10px] font-bold px-1.5 py-0.5 ${
+                      activeSection === id ? 'bg-white text-rose-700' : 'bg-rose-100 text-rose-700'
+                    }`}
+                  >
+                    {uncodedReactionsCount}
+                  </span>
+                ) : (
+                  <Check className={`h-3 w-3 ${activeSection === id ? 'text-white' : 'text-emerald-600'}`} />
+                )
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ── Workspace Grid: Left Nav + Main Form Area + Right Rail ── */}
       <div className="grid gap-6 lg:grid-cols-12">
-        {/* ── Left Section Navigator (12 Sections) ──────────── */}
-        <aside className="lg:col-span-3 space-y-1">
-          <div className="card p-2 bg-white sticky top-36">
+        {/* ── Left Section Navigator (Desktop only) ──────────── */}
+        <aside className="hidden lg:block lg:col-span-3 space-y-1">
+          <div className="card p-2 bg-white sticky top-24">
             <span className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
               Case Sections
             </span>
@@ -509,7 +625,19 @@ export default function CaseDetails() {
                     <Icon className="h-4 w-4 shrink-0 text-slate-400" />
                     <span>{label}</span>
                   </div>
-                  {activeSection === id && <ChevronRight className="h-3.5 w-3.5 text-brand-600" />}
+                  {id === 'coding' ? (
+                    uncodedReactionsCount > 0 ? (
+                      <span className="badge bg-rose-100 text-rose-700 font-bold text-[10px] px-1.5 py-0.5">
+                        {uncodedReactionsCount} uncoded
+                      </span>
+                    ) : (
+                      <span className="badge bg-emerald-50 text-emerald-700 font-medium text-[10px] flex items-center gap-0.5 px-1.5 py-0.5">
+                        <Check className="h-2.5 w-2.5" /> Coded
+                      </span>
+                    )
+                  ) : activeSection === id ? (
+                    <ChevronRight className="h-3.5 w-3.5 text-brand-600" />
+                  ) : null}
                 </button>
               ))}
             </nav>
@@ -529,7 +657,7 @@ export default function CaseDetails() {
                 <span className="text-[11px] text-slate-400">Core administrative attributes</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs">
                 <div>
                   <label className="block text-slate-500 font-medium mb-1">Report Source / Type</label>
                   <select
@@ -563,7 +691,11 @@ export default function CaseDetails() {
                   <input
                     type="date"
                     disabled={isClosed}
-                    value={formData.receiptDate ? new Date(formData.receiptDate).toISOString().split('T')[0] : ''}
+                    value={
+                      formData.receiptDate && !isNaN(new Date(formData.receiptDate).getTime())
+                        ? new Date(formData.receiptDate).toISOString().split('T')[0]
+                        : ''
+                    }
                     onChange={(e) => updateField('receiptDate', e.target.value)}
                     className="w-full rounded-xl border border-slate-200 p-2.5 text-xs bg-slate-50 focus:bg-white focus:border-brand-500 focus:outline-none"
                   />
@@ -585,6 +717,26 @@ export default function CaseDetails() {
                     <option value="ready_for_submission">Ready for Submission</option>
                     <option value="completed">Completed</option>
                   </select>
+
+                  {uncodedReactionsCount > 0 &&
+                    ['medical_review', 'quality_review', 'ready_for_submission', 'completed'].includes(formData.status) && (
+                      <div className="mt-2 rounded-xl bg-rose-50 border border-rose-200 p-2.5 flex items-start gap-2 text-xs text-rose-800">
+                        <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <span className="font-bold">Workflow Progression Blocked</span>
+                          <p className="text-[11px] text-rose-700">
+                            Cannot advance past Data Entry while {uncodedReactionsCount} reaction(s) are uncoded. All reactions must be mapped to MedDRA terms first.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setActiveSection('coding')}
+                            className="text-brand-600 font-bold underline hover:text-brand-700 block text-[11px]"
+                          >
+                            Go to MedDRA Coding Panel &rarr;
+                          </button>
+                        </div>
+                      </div>
+                    )}
                 </div>
               </div>
             </div>
@@ -601,7 +753,7 @@ export default function CaseDetails() {
                 <span className="text-[11px] text-slate-400">ICH E2B (R3) D.1-D.7</span>
               </div>
 
-              <div className="grid grid-cols-3 gap-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-xs">
                 <div>
                   <label className="block text-slate-500 font-medium mb-1">Patient Reference ID</label>
                   <input
@@ -669,7 +821,7 @@ export default function CaseDetails() {
                 <span className="text-[11px] text-slate-400">Identifiable Reporter</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs">
                 <div>
                   <label className="block text-slate-500 font-medium mb-1">Reporter Name</label>
                   <input
@@ -723,52 +875,14 @@ export default function CaseDetails() {
             </div>
           )}
 
-          {/* SECTION: Products */}
+          {/* SECTION: Products (Module 13: Product Management & Exposure Timeline) */}
           {activeSection === 'products' && (
-            <div className="card p-6 bg-white space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-slate-900 text-sm">Medicinal Products</h3>
-                  <DataOriginBadge origin="entered" />
-                </div>
-                <span className="text-[11px] text-slate-400">Suspect, Concomitant, Interacting</span>
-              </div>
-
-              <div>
-                <label className="block text-slate-500 font-medium mb-1 text-xs">Primary Suspect Product</label>
-                <input
-                  type="text"
-                  disabled={isClosed}
-                  value={formData.product || formData.caseProducts?.[0]?.productName || ''}
-                  onChange={(e) => {
-                    updateField('product', e.target.value);
-                    if (formData.caseProducts?.[0]) {
-                      updateField('caseProducts.0.productName', e.target.value);
-                    }
-                  }}
-                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs bg-slate-50 focus:bg-white font-semibold text-slate-900"
-                />
-              </div>
-
-              {formData.caseProducts && formData.caseProducts.length > 0 && (
-                <div className="space-y-3 pt-2">
-                  <span className="text-xs font-bold text-slate-700 block">Product Table:</span>
-                  {formData.caseProducts.map((p, idx) => (
-                    <div key={idx} className="rounded-xl border border-slate-200 p-3 bg-slate-50/50 space-y-2 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-900">{p.productName}</span>
-                        <span className="badge bg-indigo-50 text-indigo-700 font-semibold">{p.role}</span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 text-[11px] text-slate-600">
-                        <div>Dose: {p.dose || '—'}</div>
-                        <div>Route: {p.route || 'Oral'}</div>
-                        <div>Lot #: {p.lotNumber || '—'}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <CaseProductsEditor
+              caseId={caseData._id}
+              caseNumber={caseData.caseNumber}
+              isClosed={isClosed}
+              onCaseUpdated={fetchCase}
+            />
           )}
 
           {/* SECTION: Reactions */}
@@ -800,7 +914,7 @@ export default function CaseDetails() {
                   <DataOriginBadge origin="assessed" size="xs" />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
                   {[
                     { key: 'death', label: 'Results in Death' },
                     { key: 'lifeThreatening', label: 'Life-Threatening' },
@@ -859,88 +973,37 @@ export default function CaseDetails() {
             </div>
           )}
 
-          {/* SECTION: Assessment */}
+          {/* SECTION: Assessment - Module 7 */}
           {activeSection === 'assessment' && (
-            <div className="card p-6 bg-white space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-slate-900 text-sm">Medical Review & Causality Assessment</h3>
-                  <DataOriginBadge origin="assessed" />
-                </div>
-                <span className="text-[11px] text-slate-400">Physician causality sign-off</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 text-xs">
-                <div>
-                  <label className="block text-slate-500 font-medium mb-1">Company Causality</label>
-                  <select
-                    disabled={isClosed}
-                    value={formData.assessment?.companyCausality || 'Unassessed'}
-                    onChange={(e) => updateField('assessment.companyCausality', e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 p-2.5 text-xs bg-slate-50 focus:bg-white font-semibold"
-                  >
-                    <option value="Unassessed">Unassessed</option>
-                    <option value="Related">Related (Reasonable Possibility)</option>
-                    <option value="Not Related">Not Related</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-500 font-medium mb-1">Listedness / Expectedness</label>
-                  <select
-                    disabled={isClosed}
-                    value={formData.assessment?.listedness || 'Unknown'}
-                    onChange={(e) => updateField('assessment.listedness', e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 p-2.5 text-xs bg-slate-50 focus:bg-white"
-                  >
-                    <option value="Listed">Listed (In Reference Safety Information)</option>
-                    <option value="Unlisted">Unlisted (Unexpected)</option>
-                    <option value="Unknown">Unknown</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-500 font-medium mb-1 text-xs">Medical Reviewer Comments</label>
-                <textarea
-                  rows={4}
-                  disabled={isClosed}
-                  value={formData.assessment?.medicalReviewerComments || ''}
-                  onChange={(e) => updateField('assessment.medicalReviewerComments', e.target.value)}
-                  placeholder="Medical evaluation: Temporal relationship is plausible. Underlying conditions unlikely to account for acute onset. Causality assessed as Related."
-                  className="w-full rounded-xl border border-slate-200 p-3 text-xs bg-slate-50 focus:bg-white focus:border-brand-500 focus:outline-none"
-                />
-              </div>
-            </div>
+            <MedicalReviewWorkspace
+              caseId={caseData._id}
+              isClosed={isClosed}
+              onCaseUpdated={fetchCase}
+            />
           )}
 
-          {/* SECTION: Coding (MedDRA) */}
+          {/* SECTION: Coding (MedDRA) - Module 6 */}
           {activeSection === 'coding' && (
-            <div className="card p-6 bg-white space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-slate-900 text-sm">MedDRA Medical Dictionary Coding</h3>
-                  <DataOriginBadge origin="entered" />
-                </div>
-                <span className="text-[11px] text-slate-400">Preferred Term & SOC</span>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-800">Coded Preferred Term (PT):</span>
-                  <span className="badge bg-indigo-50 text-indigo-700 font-mono">10037844</span>
-                </div>
-                <p className="font-semibold text-slate-900 text-sm">
-                  {formData.reactions?.[0]?.pt || formData.eventSummary || 'Skin rash'}
-                </p>
-                <p className="text-slate-500 text-[11px]">
-                  System Organ Class (SOC): Skin and subcutaneous tissue disorders
-                </p>
-              </div>
-            </div>
+            <MedicalCodingPanel
+              caseId={caseData._id}
+              isClosed={isClosed}
+              onCaseUpdated={fetchCase}
+              onCodingStatusChange={setCodingSummary}
+            />
           )}
 
-          {/* SECTION: Documents */}
+          {/* SECTION: Quality Review - Module 9 */}
+          {activeSection === 'quality' && (
+            <QualityReviewWorkspace
+              caseId={caseData._id}
+              caseNumber={caseData.caseNumber}
+              caseDoc={formData || caseData}
+              onNavigateTab={(tab) => setActiveSection(tab)}
+              onReviewSubmitted={fetchCase}
+            />
+          )}
+
+          {/* SECTION: Documents (Module 17: Document Management) */}
           {activeSection === 'documents' && (
             <div className="card p-6 bg-white space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -948,84 +1011,58 @@ export default function CaseDetails() {
                   <h3 className="font-bold text-slate-900 text-sm">Source Documents & Attachments</h3>
                   <DataOriginBadge origin="reported" />
                 </div>
-                <span className="text-[11px] text-slate-400">Hospital discharge & lab reports</span>
+                <span className="text-[11px] text-slate-400">Hospital discharge, lab results & clinical records</span>
               </div>
 
-              <div className="rounded-xl border-2 border-dashed border-slate-200 p-6 text-center text-xs text-slate-500 space-y-2">
-                <Paperclip className="mx-auto h-8 w-8 text-slate-300" />
-                <p className="font-medium text-slate-700">No documents attached to this case yet.</p>
-                <p className="text-[11px] text-slate-400">PDF, JPG, PNG attachments up to 25MB.</p>
-              </div>
+              <CaseAttachmentsManager
+                caseId={caseData._id}
+                onAttachmentChange={fetchCase}
+              />
             </div>
           )}
 
-          {/* SECTION: Follow-ups */}
+          {/* SECTION: Follow-ups (Module 12) */}
           {activeSection === 'followups' && (
-            <div className="card p-6 bg-white space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-slate-900 text-sm">Follow-up Communication & Inquiries</h3>
-                  <DataOriginBadge origin="entered" />
-                </div>
-                <span className="text-[11px] text-slate-400">Query tracking</span>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-slate-800">Initial Follow-up Query:</span>
-                  <span className="badge bg-amber-50 text-amber-700">Pending Response</span>
-                </div>
-                <p className="text-[11px]">
-                  Requested discharge summary and serum creatinine lab levels from treating physician.
-                </p>
-              </div>
-            </div>
+            <FollowUpTab
+              caseId={caseData._id}
+              caseNumber={caseData.caseNumber}
+              caseData={formData || caseData}
+              onCaseUpdated={fetchCase}
+            />
           )}
 
-          {/* SECTION: Reporting */}
+          {/* SECTION: Reporting - Module 10 */}
           {activeSection === 'reporting' && (
-            <div className="card p-6 bg-white space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-slate-900 text-sm">Regulatory Reporting & Submissions</h3>
-                  <DataOriginBadge origin="assessed" />
-                </div>
-                <span className="text-[11px] text-slate-400">ICH E2B (R3) Gateway</span>
-              </div>
-
-              <div className="space-y-3 text-xs">
-                <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50">
-                  <div>
-                    <span className="font-bold text-slate-900 block">Health Authority Reporting Rule:</span>
-                    <span className="text-slate-500 text-[11px]">
-                      {caseData.seriousness === 'Serious' ? '15-Day Expedited Safety Report (ICH E2A)' : 'Non-Serious Periodic / Summary Report'}
-                    </span>
-                  </div>
-                  <span className="badge bg-blue-50 text-blue-700 font-semibold">
-                    {caseData.seriousness === 'Serious' ? '15-Day Clock Active' : 'Periodic Queue'}
-                  </span>
-                </div>
-              </div>
-            </div>
+            <CaseReportingTab
+              caseId={caseData._id}
+              caseNumber={caseData.caseNumber}
+              isClosed={isClosed}
+              onNavigateTab={(tab) => setActiveSection(tab)}
+            />
           )}
 
           {/* SECTION: History (Audit Trail) */}
           {activeSection === 'history' && (
-            <div className="card p-6 bg-white space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-slate-900 text-sm">Electronic Audit Trail (21 CFR Part 11)</h3>
-                  <DataOriginBadge origin="entered" />
+            <div className="space-y-6">
+              {/* Module 8: Stage Transition History Timeline */}
+              <WorkflowHistoryTimeline history={workflowHistory} />
+
+              {/* 21 CFR Part 11 Field Modification Log */}
+              <div className="card p-6 bg-white space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-slate-900 text-sm">Field Modification Log (21 CFR Part 11)</h3>
+                    <DataOriginBadge origin="entered" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={fetchHistory}
+                    disabled={loadingHistory}
+                    className="text-xs text-brand-600 hover:text-brand-800 font-semibold"
+                  >
+                    {loadingHistory ? 'Refreshing…' : 'Refresh'}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={fetchHistory}
-                  disabled={loadingHistory}
-                  className="text-xs text-brand-600 hover:text-brand-800 font-semibold"
-                >
-                  {loadingHistory ? 'Refreshing…' : 'Refresh'}
-                </button>
-              </div>
 
               {loadingHistory ? (
                 <div className="py-8 text-center text-xs text-slate-400">Loading audit history…</div>
@@ -1066,8 +1103,9 @@ export default function CaseDetails() {
                 </div>
               )}
             </div>
-          )}
-        </main>
+          </div>
+        )}
+      </main>
 
         {/* ── Right Rail (Workflow Timeline & Checklist) ─────── */}
         <aside className="lg:col-span-3 space-y-4">
@@ -1154,6 +1192,31 @@ export default function CaseDetails() {
           </div>
         </aside>
       </div>
+
+      {/* Module 8: Case Workflow Route Modal */}
+      {showRouteModal && (
+        <CaseRouteModal
+          isOpen={true}
+          onClose={() => setShowRouteModal(false)}
+          caseId={caseData._id}
+          caseNumber={caseData.caseNumber}
+          onRouteSuccess={() => {
+            fetchCase();
+            setShowRouteModal(false);
+          }}
+          onNavigateTab={(tab) => setActiveSection(tab)}
+        />
+      )}
+
+      {/* Module 11: ICSR / E2B Export Modal */}
+      {showIcsrExportModal && (
+        <IcsrExportModal
+          isOpen={true}
+          onClose={() => setShowIcsrExportModal(false)}
+          caseId={caseData._id}
+          caseNumber={caseData.caseNumber}
+        />
+      )}
     </div>
   );
 }

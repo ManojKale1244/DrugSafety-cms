@@ -15,6 +15,12 @@ import {
   UserCheck,
   Menu,
   X,
+  Layers,
+  Send,
+  Pill,
+  TrendingUp,
+  FileBarChart,
+  FolderArchive,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import SessionExpiredModal from '../auth/SessionExpiredModal';
@@ -49,6 +55,13 @@ export default function BaseLayout() {
           { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { to: '/intakes', label: 'Case Intake', icon: ClipboardList },
           { to: '/cases', label: 'Cases & Safety', icon: FolderOpen },
+          { to: '/products', label: 'Drug Catalogue', icon: Pill, badge: 'Rx' },
+          { to: '/duplicates', label: 'Duplicate Detection', icon: Layers, badge: 'PV' },
+          { to: '/reports', label: 'Regulatory Submissions', icon: FileSpreadsheet, badge: 'Reg' },
+          { to: '/compliance', label: 'Compliance Tracking', icon: TrendingUp, badge: 'KPI' },
+          { to: '/aggregate-reports', label: 'Aggregate Reports', icon: FileBarChart, badge: 'PSUR' },
+          { to: '/documents', label: 'Document Vault', icon: FolderArchive, badge: 'Docs' },
+          { to: '/icsr', label: 'ICSR / E2B Gateway', icon: Send, badge: 'E2B' },
           { to: '/admin/users', label: 'User Management', icon: Users, badge: 'Admin' },
           { to: '/admin/audits', label: 'Audit Trail', icon: History, badge: 'Audit' },
         ];
@@ -57,15 +70,24 @@ export default function BaseLayout() {
           { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { to: '/intakes', label: 'Case Intake', icon: ClipboardList },
           { to: '/cases', label: 'Case Management', icon: FolderOpen },
+          { to: '/products', label: 'Drug Catalogue', icon: Pill, badge: 'Rx' },
+          { to: '/duplicates', label: 'Duplicate Detection', icon: Layers, badge: 'PV' },
+          { to: '/icsr', label: 'ICSR / E2B Gateway', icon: Send, badge: 'E2B' },
           { to: '/workload', label: 'Team Workload', icon: UserCheck },
           { to: '/action-items', label: 'Action Items', icon: CheckSquare },
           { to: '/reports', label: 'Safety Reports', icon: FileSpreadsheet },
+          { to: '/compliance', label: 'Compliance Tracking', icon: TrendingUp, badge: 'KPI' },
+          { to: '/aggregate-reports', label: 'Aggregate Reports', icon: FileBarChart, badge: 'PSUR' },
+          { to: '/documents', label: 'Document Vault', icon: FolderArchive, badge: 'Docs' },
         ];
       case 'reviewer':
         return [
           { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { to: '/intakes', label: 'Case Intake', icon: ClipboardList },
           { to: '/cases', label: 'My Assigned Cases', icon: FolderOpen },
+          { to: '/duplicates', label: 'Duplicate Detection', icon: Layers, badge: 'PV' },
+          { to: '/icsr', label: 'ICSR / E2B Gateway', icon: Send, badge: 'E2B' },
+          { to: '/documents', label: 'Document Vault', icon: FolderArchive, badge: 'Docs' },
           { to: '/action-items', label: 'Action Items', icon: CheckSquare },
           { to: '/medical-review', label: 'Medical Assessment', icon: ClipboardList },
         ];
@@ -74,6 +96,10 @@ export default function BaseLayout() {
           { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { to: '/intakes', label: 'Adverse Event Intake', icon: ClipboardList },
           { to: '/cases', label: 'Case Registry', icon: FolderOpen },
+          { to: '/products', label: 'Drug Catalogue', icon: Pill, badge: 'Rx' },
+          { to: '/duplicates', label: 'Duplicate Screening', icon: Layers },
+          { to: '/documents', label: 'Document Vault', icon: FolderArchive, badge: 'Docs' },
+          { to: '/icsr', label: 'ICSR / E2B Gateway', icon: Send, badge: 'E2B' },
           { to: '/contact-logs', label: 'Contact Log Registry', icon: FileText },
         ];
       case 'qa_specialist':
@@ -81,7 +107,12 @@ export default function BaseLayout() {
           { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { to: '/intakes', label: 'Case Intake', icon: ClipboardList },
           { to: '/cases', label: 'Case Quality Review', icon: FolderOpen },
+          { to: '/duplicates', label: 'Duplicate Detection', icon: Layers },
+          { to: '/icsr', label: 'ICSR / E2B Gateway', icon: Send, badge: 'E2B' },
           { to: '/admin/audits', label: 'Compliance Audits', icon: History },
+          { to: '/compliance', label: 'Compliance Tracking', icon: TrendingUp, badge: 'KPI' },
+          { to: '/aggregate-reports', label: 'Aggregate Reports', icon: FileBarChart, badge: 'PSUR' },
+          { to: '/documents', label: 'Document Vault', icon: FolderArchive, badge: 'Docs' },
           { to: '/action-items', label: 'Action Items', icon: CheckSquare },
         ];
       case 'regulatory_affairs':
@@ -89,7 +120,12 @@ export default function BaseLayout() {
           { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { to: '/intakes', label: 'Case Intake', icon: ClipboardList },
           { to: '/cases', label: 'Regulatory Cases', icon: FolderOpen },
+          { to: '/duplicates', label: 'Duplicate Detection', icon: Layers },
           { to: '/reports', label: 'Submission Reports', icon: FileSpreadsheet },
+          { to: '/compliance', label: 'Compliance Tracking', icon: TrendingUp, badge: 'KPI' },
+          { to: '/aggregate-reports', label: 'Aggregate Reports', icon: FileBarChart, badge: 'PSUR' },
+          { to: '/documents', label: 'Document Vault', icon: FolderArchive, badge: 'Docs' },
+          { to: '/icsr', label: 'ICSR / E2B Gateway', icon: Send, badge: 'E2B' },
         ];
       case 'viewer':
       default:
@@ -97,6 +133,8 @@ export default function BaseLayout() {
           { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { to: '/intakes', label: 'Intake Records', icon: ClipboardList },
           { to: '/cases', label: 'Case Records (Read)', icon: FolderOpen },
+          { to: '/documents', label: 'Document Vault', icon: FolderArchive, badge: 'Docs' },
+          { to: '/duplicates', label: 'Duplicate Queue', icon: Layers },
         ];
     }
   };

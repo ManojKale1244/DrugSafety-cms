@@ -283,7 +283,7 @@ export default function Users() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
           {selectedUserIds.length > 0 && (
             <button
               type="button"
@@ -385,40 +385,20 @@ export default function Users() {
             <p className="mt-1 text-sm text-slate-500">Try adjusting your search criteria or role filters.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left text-sm text-slate-600">
-              <thead className="border-b border-surface-border bg-slate-50 text-xs font-semibold uppercase text-slate-500">
-                <tr>
-                  <th scope="col" className="p-4 w-12 text-center">
-                    <input
-                      type="checkbox"
-                      checked={
-                        selectedUserIds.length > 0 &&
-                        users.every((u) => u._id === currentUser?.id || selectedUserIds.includes(u._id))
-                      }
-                      onChange={handleToggleSelectAll}
-                      className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                      aria-label="Select all users"
-                    />
-                  </th>
-                  <th scope="col" className="px-4 py-3.5">User</th>
-                  <th scope="col" className="px-4 py-3.5">Role</th>
-                  <th scope="col" className="px-4 py-3.5">Account Status</th>
-                  <th scope="col" className="px-4 py-3.5">Last Login</th>
-                  <th scope="col" className="px-4 py-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-surface-border">
-                {users.map((u) => {
-                  const isSelf = u._id === currentUser?.id;
-                  const isSelected = selectedUserIds.includes(u._id);
+          <>
+            {/* ── Mobile Card View (< md) ───────────────────── */}
+            <div className="divide-y divide-surface-border md:hidden">
+              {users.map((u) => {
+                const isSelf = u._id === currentUser?.id;
+                const isSelected = selectedUserIds.includes(u._id);
 
-                  return (
-                    <tr
-                      key={u._id}
-                      className={`hover:bg-slate-50/70 transition-colors ${isSelected ? 'bg-brand-50/30' : ''}`}
-                    >
-                      <td className="p-4 text-center">
+                return (
+                  <div
+                    key={u._id}
+                    className={`p-4 space-y-3 transition-colors ${isSelected ? 'bg-brand-50/40' : 'hover:bg-slate-50/70'}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
                         <input
                           type="checkbox"
                           disabled={isSelf}
@@ -427,30 +407,27 @@ export default function Users() {
                           className="rounded border-slate-300 text-brand-600 focus:ring-brand-500 disabled:opacity-40"
                           aria-label={`Select ${u.name}`}
                         />
-                      </td>
-
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-slate-700 font-bold text-xs uppercase shadow-xs">
-                            {u.name?.slice(0, 2)}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-slate-900 flex items-center gap-2">
-                              {u.name}
-                              {isSelf && (
-                                <span className="rounded bg-slate-100 px-1.5 py-0.2 text-[10px] font-bold text-slate-600">
-                                  You
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-xs text-slate-400">{u.email}</div>
-                          </div>
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-slate-700 font-bold text-xs uppercase shadow-xs shrink-0">
+                          {u.name?.slice(0, 2)}
                         </div>
-                      </td>
+                        <div>
+                          <div className="font-semibold text-slate-900 text-sm flex items-center gap-1.5">
+                            {u.name}
+                            {isSelf && (
+                              <span className="rounded bg-slate-100 px-1.5 py-0.2 text-[10px] font-bold text-slate-600">
+                                You
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-slate-400">{u.email}</div>
+                        </div>
+                      </div>
 
-                      <td className="px-4 py-3.5">{getRoleBadge(u.roleId)}</td>
+                      {getRoleBadge(u.roleId)}
+                    </div>
 
-                      <td className="px-4 py-3.5">
+                    <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-100">
+                      <div className="flex items-center gap-2">
                         <button
                           type="button"
                           disabled={isSelf}
@@ -474,37 +451,155 @@ export default function Users() {
                             </>
                           )}
                         </button>
-                      </td>
+                      </div>
 
-                      <td className="px-4 py-3.5 text-xs text-slate-500">
-                        {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString('en-IN') : 'Never'}
-                      </td>
-
-                      <td className="px-4 py-3.5 text-right space-x-2">
+                      <div className="flex items-center gap-1">
                         <button
                           type="button"
                           onClick={() => handleOpenHistory(u)}
-                          className="inline-flex items-center gap-1 rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-                          title="View Login History"
+                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-100 transition-colors"
                         >
-                          <History className="h-4 w-4" />
+                          <History className="h-3.5 w-3.5" />
+                          <span>Logs</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => handleOpenEdit(u)}
-                          className="inline-flex items-center gap-1 rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-                          title="Edit User"
+                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-brand-600 hover:bg-brand-50 transition-colors"
                         >
-                          <Edit2 className="h-4 w-4" />
+                          <Edit2 className="h-3.5 w-3.5" />
+                          <span>Edit</span>
                         </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* ── Desktop & Tablet Table (md+) ─────────────── */}
+            <div className="hidden md:block overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left text-sm text-slate-600">
+                <thead className="border-b border-surface-border bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+                  <tr>
+                    <th scope="col" className="p-4 w-12 text-center">
+                      <input
+                        type="checkbox"
+                        checked={
+                          selectedUserIds.length > 0 &&
+                          users.every((u) => u._id === currentUser?.id || selectedUserIds.includes(u._id))
+                        }
+                        onChange={handleToggleSelectAll}
+                        className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                        aria-label="Select all users"
+                      />
+                    </th>
+                    <th scope="col" className="px-4 py-3.5">User</th>
+                    <th scope="col" className="px-4 py-3.5">Role</th>
+                    <th scope="col" className="px-4 py-3.5">Account Status</th>
+                    <th scope="col" className="px-4 py-3.5">Last Login</th>
+                    <th scope="col" className="px-4 py-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-surface-border">
+                  {users.map((u) => {
+                    const isSelf = u._id === currentUser?.id;
+                    const isSelected = selectedUserIds.includes(u._id);
+
+                    return (
+                      <tr
+                        key={u._id}
+                        className={`hover:bg-slate-50/70 transition-colors ${isSelected ? 'bg-brand-50/30' : ''}`}
+                      >
+                        <td className="p-4 text-center">
+                          <input
+                            type="checkbox"
+                            disabled={isSelf}
+                            checked={isSelected}
+                            onChange={() => handleToggleSelectOne(u._id)}
+                            className="rounded border-slate-300 text-brand-600 focus:ring-brand-500 disabled:opacity-40"
+                            aria-label={`Select ${u.name}`}
+                          />
+                        </td>
+
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-slate-700 font-bold text-xs uppercase shadow-xs">
+                              {u.name?.slice(0, 2)}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-slate-900 flex items-center gap-2">
+                                {u.name}
+                                {isSelf && (
+                                  <span className="rounded bg-slate-100 px-1.5 py-0.2 text-[10px] font-bold text-slate-600">
+                                    You
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-slate-400">{u.email}</div>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3.5">{getRoleBadge(u.roleId)}</td>
+
+                        <td className="px-4 py-3.5">
+                          <button
+                            type="button"
+                            disabled={isSelf}
+                            onClick={() => handleToggleStatus(u)}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
+                              u.status === 'active'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                            } ${isSelf ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
+                            title={isSelf ? 'Cannot deactivate yourself' : 'Click to toggle status'}
+                          >
+                            {u.status === 'active' ? (
+                              <>
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                                Active
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="h-3.5 w-3.5 text-slate-400" />
+                                Inactive
+                              </>
+                            )}
+                          </button>
+                        </td>
+
+                        <td className="px-4 py-3.5 text-xs text-slate-500">
+                          {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString('en-IN') : 'Never'}
+                        </td>
+
+                        <td className="px-4 py-3.5 text-right space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenHistory(u)}
+                            className="inline-flex items-center gap-1 rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                            title="View Login History"
+                          >
+                            <History className="h-4 w-4" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(u)}
+                            className="inline-flex items-center gap-1 rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                            title="Edit User"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {/* Pagination Footer */}

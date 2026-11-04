@@ -11,12 +11,22 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  List,
+  Kanban,
+  BarChart3,
+  Sliders,
+  Award,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import api from '../services/api';
 import Can from '../components/auth/Can';
 import DataOriginBadge from '../components/case/DataOriginBadge';
+import { formatCasesListWhatsApp, openWhatsAppShare } from '../utils/whatsappFormatter';
+import KanbanBoard from '../components/workflow/KanbanBoard';
+import TeamWorkloadPanel from '../components/workflow/TeamWorkloadPanel';
+import CaseRouteModal from '../components/workflow/CaseRouteModal';
+import QualityMetricsCard from '../components/quality/QualityMetricsCard';
 
 const QUICK_FILTERS = [
   { id: 'all', label: 'All Cases', params: {} },
@@ -56,6 +66,10 @@ export default function Cases() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // View Mode: 'table' | 'kanban' | 'workload'
+  const [viewMode, setViewMode] = useState('table');
+  const [routingCase, setRoutingCase] = useState(null);
+
   // Filters & State
   const [activeQuickFilter, setActiveQuickFilter] = useState('all');
   const [search, setSearch] = useState(searchParams.get('search') || '');
@@ -85,8 +99,8 @@ export default function Cases() {
     try {
       const qf = QUICK_FILTERS.find((f) => f.id === activeQuickFilter)?.params || {};
       const params = {
-        page,
-        limit: 15,
+        page: viewMode === 'kanban' ? 1 : page,
+        limit: viewMode === 'kanban' ? 100 : 15,
         search,
         status: statusFilter || qf.status,
         priority: priorityFilter || qf.priority,
@@ -107,7 +121,7 @@ export default function Cases() {
     } finally {
       setLoading(false);
     }
-  }, [activeQuickFilter, search, statusFilter, priorityFilter, seriousnessFilter, page]);
+  }, [activeQuickFilter, search, statusFilter, priorityFilter, seriousnessFilter, page, viewMode]);
 
   useEffect(() => {
     fetchCases();
@@ -245,38 +259,15 @@ export default function Cases() {
     }
   };
 
-  // Share Safety Report to WhatsApp
+  // Share Safety Report to WhatsApp in professional executive format
   const handleShareWhatsApp = () => {
     const qf = QUICK_FILTERS.find((f) => f.id === activeQuickFilter)?.label || 'All';
-    const timestamp = new Date().toLocaleString('en-US', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
+    const message = formatCasesListWhatsApp({
+      cases,
+      totalCases,
+      activeQuickFilter: qf,
     });
-
-    const topCases = cases.slice(0, 5).map((c, i) => {
-      const prod = c.product || c.caseProducts?.[0]?.productName || 'N/A';
-      const event = c.eventSummary || c.reactions?.[0]?.verbatim || 'N/A';
-      const ser = c.seriousness === 'Serious' ? '🔴 Serious' : '🟢 Non-Serious';
-      return `${i + 1}. *${c.caseNumber}* (${prod}) - ${event} [${ser}]`;
-    }).join('\n');
-
-    const message = [
-      `🛡️ *DRUG SAFETY CMS — PHARMACOVIGILANCE REPORT* 🛡️`,
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-      `📅 *Date:* ${timestamp}`,
-      `🔍 *Filter:* ${qf}`,
-      `📊 *Total Cases in View:* ${totalCases || cases.length}`,
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-      `📋 *Key Safety Cases:*`,
-      topCases || 'No cases found for this criteria.',
-      ...(cases.length > 5 ? [`_...and ${cases.length - 5} more cases in directory._`] : []),
-      `━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-      `🔗 *Open Platform:* ${window.location.origin}/cases`,
-      `🔒 _Confidential — Regulated Pharmacovigilance Data_`,
-    ].join('\n');
-
-    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+    openWhatsAppShare(message);
   };
 
   const getStatusPill = (status) => {
@@ -376,28 +367,113 @@ export default function Cases() {
         </div>
       </div>
 
-      {/* ── Saved Filters (Quick Views) ────────────────────── */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-        {QUICK_FILTERS.map((qf) => (
+      {/* ── View Switcher & Saved Filters (Quick Views) ───── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200/80 w-fit">
           <button
-            key={qf.id}
             type="button"
-            onClick={() => {
-              setActiveQuickFilter(qf.id);
-              setPage(1);
-            }}
-            className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-all border ${
-              activeQuickFilter === qf.id
-                ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+            onClick={() => setViewMode('table')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              viewMode === 'table'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            {qf.label}
+            <List className="h-3.5 w-3.5" />
+            <span>Table View</span>
           </button>
-        ))}
+
+          <button
+            type="button"
+            onClick={() => setViewMode('kanban')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              viewMode === 'kanban'
+                ? 'bg-white text-brand-700 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Kanban className="h-3.5 w-3.5" />
+            <span>Kanban Board</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewMode('workload')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              viewMode === 'workload'
+                ? 'bg-white text-indigo-700 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <BarChart3 className="h-3.5 w-3.5" />
+            <span>Team Workload</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewMode('quality')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              viewMode === 'quality'
+                ? 'bg-white text-emerald-700 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Award className="h-3.5 w-3.5" />
+            <span>Quality Metrics</span>
+          </button>
+        </div>
+
+        {viewMode !== 'workload' && viewMode !== 'quality' && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {QUICK_FILTERS.map((qf) => (
+              <button
+                key={qf.id}
+                type="button"
+                onClick={() => {
+                  setActiveQuickFilter(qf.id);
+                  setPage(1);
+                }}
+                className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap shrink-0 transition-all border ${
+                  activeQuickFilter === qf.id
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+              >
+                {qf.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* ── Search, Filters, Column Chooser & Density Toolbar ── */}
+      {viewMode === 'workload' ? (
+        <TeamWorkloadPanel />
+      ) : viewMode === 'quality' ? (
+        <QualityMetricsCard />
+      ) : viewMode === 'kanban' ? (
+        <div className="space-y-4">
+          {/* Quick Search for Kanban */}
+          <div className="card p-3 bg-white flex items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-2.5" />
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Filter cases in board…"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-8 pr-3 py-1.5 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              />
+            </div>
+            <div className="text-xs text-slate-500">
+              Showing <strong>{cases.length}</strong> active cases across stages
+            </div>
+          </div>
+
+          <KanbanBoard cases={cases} onCaseRouted={fetchCases} />
+        </div>
+      ) : (
+        <>
+          {/* ── Search, Filters, Column Chooser & Density Toolbar ── */}
       <div className="card p-3.5 sm:p-4 space-y-3 bg-white shadow-xs">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           {/* Search Bar */}
@@ -564,161 +640,256 @@ export default function Cases() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                  {visibleColumns.caseNumber && <th className="py-3 px-3.5">Case #</th>}
-                  {visibleColumns.status && <th className="py-3 px-3.5">Status</th>}
-                  {visibleColumns.priority && <th className="py-3 px-3.5">Priority</th>}
-                  {visibleColumns.product && <th className="py-3 px-3.5">Product</th>}
-                  {visibleColumns.eventSummary && <th className="py-3 px-3.5">Reaction / Event</th>}
-                  {visibleColumns.patient && <th className="py-3 px-3.5">Patient</th>}
-                  {visibleColumns.reporter && <th className="py-3 px-3.5">Reporter</th>}
-                  {visibleColumns.assignedTo && <th className="py-3 px-3.5">Assignee</th>}
-                  {visibleColumns.receiptDate && <th className="py-3 px-3.5">Receipt Date</th>}
-                  {visibleColumns.dueDate && <th className="py-3 px-3.5">Due Date</th>}
-                  <th className="py-3 px-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {cases.map((c) => (
-                  <tr
-                    key={c._id}
-                    onClick={() => navigate(`/cases/${c.caseNumber}`)}
-                    className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
-                  >
-                    {/* Case Number */}
-                    {visibleColumns.caseNumber && (
-                      <td className={densityPadding}>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-brand-600 group-hover:text-brand-800 text-xs">
-                            {c.caseNumber}
-                          </span>
-                          {c.seriousness === 'Serious' && (
-                            <span className="badge bg-red-50 text-red-700 text-[10px] font-bold ring-red-600/20">
-                              Serious
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-slate-400 block mt-0.5">
-                          v{c.version || 1} • {c.reportType || c.source || 'Spontaneous'}
+          <>
+            {/* ── Mobile Card View (< md) ───────────────────── */}
+            <div className="divide-y divide-slate-100 md:hidden">
+              {cases.map((c) => (
+                <div
+                  key={c._id}
+                  onClick={() => navigate(`/cases/${c.caseNumber}`)}
+                  className="p-4 hover:bg-slate-50/80 transition-colors cursor-pointer space-y-2.5 active:bg-slate-100"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-brand-600 text-sm">
+                        {c.caseNumber}
+                      </span>
+                      {c.seriousness === 'Serious' && (
+                        <span className="badge bg-red-50 text-red-700 text-[10px] font-bold ring-red-600/20">
+                          Serious
                         </span>
-                      </td>
-                    )}
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {getStatusPill(c.status)}
+                      {getPriorityPill(c.priority)}
+                    </div>
+                  </div>
 
-                    {/* Status */}
-                    {visibleColumns.status && (
-                      <td className={densityPadding}>{getStatusPill(c.status)}</td>
-                    )}
-
-                    {/* Priority */}
-                    {visibleColumns.priority && (
-                      <td className={densityPadding}>{getPriorityPill(c.priority)}</td>
-                    )}
-
-                    {/* Suspect Product */}
-                    {visibleColumns.product && (
-                      <td className={densityPadding}>
-                        <span className="font-semibold text-slate-800 block">
-                          {c.product || c.caseProducts?.[0]?.productName || '—'}
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-semibold uppercase">Product</span>
+                      <span className="font-semibold text-slate-800 truncate block">
+                        {c.product || c.caseProducts?.[0]?.productName || '—'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-semibold uppercase">Reaction / Event</span>
+                      <div className="flex items-center gap-1">
+                        <DataOriginBadge origin="reported" size="xs" />
+                        <span className="font-medium text-slate-800 truncate block">
+                          {c.eventSummary || c.reactions?.[0]?.verbatim || '—'}
                         </span>
-                        {c.caseProducts?.length > 1 && (
-                          <span className="text-[10px] text-slate-400">
-                            +{c.caseProducts.length - 1} concomitant
-                          </span>
-                        )}
-                      </td>
-                    )}
+                      </div>
+                    </div>
+                  </div>
 
-                    {/* Reaction / Event */}
-                    {visibleColumns.eventSummary && (
-                      <td className={`${densityPadding} max-w-xs`}>
-                        <div className="flex items-center gap-1.5">
-                          <DataOriginBadge origin="reported" size="xs" />
-                          <span className="font-medium text-slate-800 truncate block">
-                            {c.eventSummary || c.reactions?.[0]?.verbatim || '—'}
-                          </span>
-                        </div>
-                      </td>
-                    )}
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1.5 border-t border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <span>Pt: <strong>{c.patient?.reference || 'Pt-Ref'}</strong></span>
+                      <span>•</span>
+                      <span>{c.receiptDate ? new Date(c.receiptDate).toLocaleDateString() : '—'}</span>
+                    </div>
 
-                    {/* Patient */}
-                    {visibleColumns.patient && (
-                      <td className={densityPadding}>
-                        <span className="text-slate-800 font-medium block">
-                          {c.patient?.reference || 'Pt-Ref'}
-                        </span>
-                        <span className="text-[10px] text-slate-400 block">
-                          {c.patient?.age != null ? `${c.patient.age}y` : c.patientAge != null ? `${c.patientAge}y` : 'Age N/A'} • {c.patient?.sex || c.patientGender || 'Unknown'}
-                        </span>
-                      </td>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRoutingCase(c);
+                        }}
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50"
+                      >
+                        <Sliders className="h-3 w-3" />
+                        <span>Route</span>
+                      </button>
 
-                    {/* Reporter */}
-                    {visibleColumns.reporter && (
-                      <td className={densityPadding}>
-                        <span className="text-slate-800 font-medium block">
-                          {c.reporter?.name || 'HCP'}
-                        </span>
-                        <span className="text-[10px] text-slate-400 block">
-                          {c.reporter?.qualification || 'Physician'}
-                        </span>
-                      </td>
-                    )}
-
-                    {/* Assignee */}
-                    {visibleColumns.assignedTo && (
-                      <td className={densityPadding}>
-                        {c.assignedTo ? (
-                          <div className="flex items-center gap-1.5">
-                            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-100 text-[10px] font-bold text-brand-700">
-                              {c.assignedTo.name?.slice(0, 1)}
-                            </div>
-                            <span className="text-slate-700 font-medium truncate max-w-[120px]">
-                              {c.assignedTo.name}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 italic">Unassigned</span>
-                        )}
-                      </td>
-                    )}
-
-                    {/* Receipt Date */}
-                    {visibleColumns.receiptDate && (
-                      <td className={densityPadding}>
-                        <span className="text-slate-700">
-                          {c.receiptDate ? new Date(c.receiptDate).toLocaleDateString() : '—'}
-                        </span>
-                      </td>
-                    )}
-
-                    {/* Regulatory Due Date */}
-                    {visibleColumns.dueDate && (
-                      <td className={densityPadding}>
-                        <span className="text-slate-700">
-                          {c.regulatoryDueDate ? new Date(c.regulatoryDueDate).toLocaleDateString() : '—'}
-                        </span>
-                      </td>
-                    )}
-
-                    {/* Actions */}
-                    <td className={`${densityPadding} text-right`}>
                       <Link
                         to={`/cases/${c.caseNumber}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-brand-600 hover:bg-brand-50 transition-colors"
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-800"
                       >
                         <Eye className="h-3.5 w-3.5" />
                         <span>View</span>
                       </Link>
-                    </td>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* ── Desktop & Tablet Table (md+) ─────────────── */}
+            <div className="hidden md:block overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    {visibleColumns.caseNumber && <th className="py-3 px-3.5">Case #</th>}
+                    {visibleColumns.status && <th className="py-3 px-3.5">Status</th>}
+                    {visibleColumns.priority && <th className="py-3 px-3.5">Priority</th>}
+                    {visibleColumns.product && <th className="py-3 px-3.5">Product</th>}
+                    {visibleColumns.eventSummary && <th className="py-3 px-3.5">Reaction / Event</th>}
+                    {visibleColumns.patient && <th className="py-3 px-3.5">Patient</th>}
+                    {visibleColumns.reporter && <th className="py-3 px-3.5">Reporter</th>}
+                    {visibleColumns.assignedTo && <th className="py-3 px-3.5">Assignee</th>}
+                    {visibleColumns.receiptDate && <th className="py-3 px-3.5">Receipt Date</th>}
+                    {visibleColumns.dueDate && <th className="py-3 px-3.5">Due Date</th>}
+                    <th className="py-3 px-3.5 text-right">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {cases.map((c) => (
+                    <tr
+                      key={c._id}
+                      onClick={() => navigate(`/cases/${c.caseNumber}`)}
+                      className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
+                    >
+                      {/* Case Number */}
+                      {visibleColumns.caseNumber && (
+                        <td className={densityPadding}>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-brand-600 group-hover:text-brand-800 text-xs">
+                              {c.caseNumber}
+                            </span>
+                            {c.seriousness === 'Serious' && (
+                              <span className="badge bg-red-50 text-red-700 text-[10px] font-bold ring-red-600/20">
+                                Serious
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-400 block mt-0.5">
+                            v{c.version || 1} • {c.reportType || c.source || 'Spontaneous'}
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Status */}
+                      {visibleColumns.status && (
+                        <td className={densityPadding}>{getStatusPill(c.status)}</td>
+                      )}
+
+                      {/* Priority */}
+                      {visibleColumns.priority && (
+                        <td className={densityPadding}>{getPriorityPill(c.priority)}</td>
+                      )}
+
+                      {/* Suspect Product */}
+                      {visibleColumns.product && (
+                        <td className={densityPadding}>
+                          <span className="font-semibold text-slate-800 block">
+                            {c.product || c.caseProducts?.[0]?.productName || '—'}
+                          </span>
+                          {c.caseProducts?.length > 1 && (
+                            <span className="text-[10px] text-slate-400">
+                              +{c.caseProducts.length - 1} concomitant
+                            </span>
+                          )}
+                        </td>
+                      )}
+
+                      {/* Reaction / Event */}
+                      {visibleColumns.eventSummary && (
+                        <td className={`${densityPadding} max-w-xs`}>
+                          <div className="flex items-center gap-1.5">
+                            <DataOriginBadge origin="reported" size="xs" />
+                            <span className="font-medium text-slate-800 truncate block">
+                              {c.eventSummary || c.reactions?.[0]?.verbatim || '—'}
+                            </span>
+                          </div>
+                        </td>
+                      )}
+
+                      {/* Patient */}
+                      {visibleColumns.patient && (
+                        <td className={densityPadding}>
+                          <span className="text-slate-800 font-medium block">
+                            {c.patient?.reference || 'Pt-Ref'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block">
+                            {c.patient?.age != null ? `${c.patient.age}y` : c.patientAge != null ? `${c.patientAge}y` : 'Age N/A'} • {c.patient?.sex || c.patientGender || 'Unknown'}
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Reporter */}
+                      {visibleColumns.reporter && (
+                        <td className={densityPadding}>
+                          <span className="text-slate-800 font-medium block">
+                            {c.reporter?.name || 'HCP'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block">
+                            {c.reporter?.qualification || 'Physician'}
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Assignee */}
+                      {visibleColumns.assignedTo && (
+                        <td className={densityPadding}>
+                          {c.assignedTo ? (
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-100 text-[10px] font-bold text-brand-700">
+                                {c.assignedTo.name?.slice(0, 1)}
+                              </div>
+                              <span className="text-slate-700 font-medium truncate max-w-[120px]">
+                                {c.assignedTo.name}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 italic">Unassigned</span>
+                          )}
+                        </td>
+                      )}
+
+                      {/* Receipt Date */}
+                      {visibleColumns.receiptDate && (
+                        <td className={densityPadding}>
+                          <span className="text-slate-700">
+                            {c.receiptDate ? new Date(c.receiptDate).toLocaleDateString() : '—'}
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Regulatory Due Date */}
+                      {visibleColumns.dueDate && (
+                        <td className={densityPadding}>
+                          <span className="text-slate-700">
+                            {c.regulatoryDueDate ? new Date(c.regulatoryDueDate).toLocaleDateString() : '—'}
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Actions */}
+                      <td className={`${densityPadding} text-right`}>
+                        <div className="inline-flex items-center gap-1.5 justify-end">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRoutingCase(c);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-slate-700 hover:text-brand-700 hover:bg-brand-50 border border-slate-200 shadow-2xs transition-colors"
+                            title="Route case through workflow engine"
+                          >
+                            <Sliders className="h-3 w-3" />
+                            <span>Route</span>
+                          </button>
+
+                          <Link
+                            to={`/cases/${c.caseNumber}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-brand-600 hover:bg-brand-50 transition-colors"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            <span>View</span>
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {/* ── Pagination ──────────────────────────────────────── */}
@@ -755,6 +926,22 @@ export default function Cases() {
           </div>
         )}
       </div>
-    </div>
-  );
+    </>
+  )}
+
+  {/* Case Route Modal */}
+  {routingCase && (
+    <CaseRouteModal
+      isOpen={true}
+      onClose={() => setRoutingCase(null)}
+      caseId={routingCase._id}
+      caseNumber={routingCase.caseNumber}
+      onRouteSuccess={() => {
+        fetchCases();
+        setRoutingCase(null);
+      }}
+    />
+  )}
+</div>
+);
 }
