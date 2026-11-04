@@ -1,13 +1,20 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Base directory for uploads
-const DEFAULT_UPLOADS_DIR = path.resolve(__dirname, '../../../uploads/attachments');
+// Base directory for uploads:
+// In serverless hosting (Vercel, AWS Lambda), the code bundle (/var/task) is strictly read-only.
+// Only os.tmpdir() (/tmp) is writable.
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT);
+const DEFAULT_UPLOADS_DIR = isServerless
+  ? path.join(os.tmpdir(), 'drug-safety-cms', 'uploads', 'attachments')
+  : path.resolve(__dirname, '../../../uploads/attachments');
+
 const SECRET_KEY = process.env.ATTACHMENT_SECRET || 'drug-safety-cms-storage-secret-key-2026';
 
 export class LocalDiskAdapter {
@@ -18,8 +25,21 @@ export class LocalDiskAdapter {
   }
 
   ensureBaseDir() {
-    if (!fs.existsSync(this.baseDir)) {
-      fs.mkdirSync(this.baseDir, { recursive: true });
+    try {
+      if (!fs.existsSync(this.baseDir)) {
+        fs.mkdirSync(this.baseDir, { recursive: true });
+      }
+    } catch (err) {
+      // If mkdir fails (e.g. read-only filesystem on cloud hosts), fallback safely to os.tmpdir()
+      try {
+        const fallbackDir = path.join(os.tmpdir(), 'drug-safety-cms', 'uploads', 'attachments');
+        if (!fs.existsSync(fallbackDir)) {
+          fs.mkdirSync(fallbackDir, { recursive: true });
+        }
+        this.baseDir = fallbackDir;
+      } catch {
+        // Suppress error so server startup is NEVER blocked by missing directories
+      }
     }
   }
 
@@ -30,14 +50,26 @@ export class LocalDiskAdapter {
   }
 
   async uploadFile({ key, buffer }) {
-    const targetPath = this.getFilePath(key);
-    const targetDir = path.dirname(targetPath);
+    this.ensureBaseDir();
+    let targetPath = this.getFilePath(key);
+    let targetDir = path.dirname(targetPath);
 
-    if (!fs.existsSync(targetDir)) {
-      fs.mkdirSync(targetDir, { recursive: true });
+    try {
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+      await fs.promises.writeFile(targetPath, buffer);
+    } catch {
+      // Fallback to os.tmpdir() if base directory was unwritable
+      this.baseDir = path.join(os.tmpdir(), 'drug-safety-cms', 'uploads', 'attachments');
+      targetPath = this.getFilePath(key);
+      targetDir = path.dirname(targetPath);
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+      await fs.promises.writeFile(targetPath, buffer);
     }
 
-    await fs.promises.writeFile(targetPath, buffer);
     return {
       storageKey: key,
       storageProvider: this.providerName,
