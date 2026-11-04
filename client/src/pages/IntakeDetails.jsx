@@ -21,6 +21,7 @@ import api from '../services/api';
 import { formatErrorMessage } from '../utils/errorHelper';
 import { formatIntakeWhatsApp, openWhatsAppShare, WhatsAppIcon } from '../utils/whatsappFormatter';
 import CaseAttachmentsManager from '../components/case/CaseAttachmentsManager';
+import MinimumCriteriaChecklist from '../components/intake/MinimumCriteriaChecklist';
 
 const TABS = [
   { id: 'details', label: 'Intake Details', icon: FileText },
