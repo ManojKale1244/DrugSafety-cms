@@ -4,6 +4,9 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import mongoose from 'mongoose';
 import { config } from './config/index.js';
@@ -14,6 +17,10 @@ import { Term } from './models/Term.js';
 import { seedDatabase } from './seeds/seed.js';
 import { seedSyntheticTerminology } from './seeds/syntheticTerminology.js';
 import { logger } from './utils/logger.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const spaHtmlPath = path.resolve(__dirname, 'index.html');
 
 const app = express();
 
@@ -128,6 +135,19 @@ async function ensureDatabaseConnected() {
     throw err;
   }
 }
+
+// ── SPA Fallback for Direct Navigation / Page Reload ──────────
+// When a browser requests a page URL (e.g. /dashboard, /intakes, /login, /cases/123),
+// immediately serve the React SPA index.html with HTTP 200 without waiting for database operations.
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/health')) {
+    return next();
+  }
+  if (fs.existsSync(spaHtmlPath)) {
+    return res.sendFile(spaHtmlPath);
+  }
+  return next();
+});
 
 app.use(async (req, res, next) => {
   // Always allow health checks through even if DB is reconnecting

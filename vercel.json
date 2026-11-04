@@ -12,21 +12,33 @@
   },
   "rewrites": [
     {
-      "source": "/api/(.*)",
+      "source": "/assets/(.*)",
       "destination": {
-        "service": "server"
+        "service": "client"
       }
     },
     {
-      "source": "/health",
+      "source": "/favicon.svg",
       "destination": {
-        "service": "server"
+        "service": "client"
+      }
+    },
+    {
+      "source": "/favicon.ico",
+      "destination": {
+        "service": "client"
+      }
+    },
+    {
+      "source": "/robots.txt",
+      "destination": {
+        "service": "client"
       }
     },
     {
       "source": "/(.*)",
       "destination": {
-        "service": "client"
+        "service": "server"
       }
     }
   ]

@@ -14,7 +14,9 @@ function copy404Plugin() {
       try {
         if (fs.existsSync(idx)) {
           fs.copyFileSync(idx, fallback);
-          console.log('✓ SPA Fallback: Generated dist/404.html from dist/index.html');
+          const serverIndex = path.resolve(__dirname, '../server/src/index.html');
+          fs.copyFileSync(idx, serverIndex);
+          console.log('✓ SPA Fallback: Generated dist/404.html and server/src/index.html');
         }
       } catch (err) {
         console.warn('Notice: Could not copy 404.html:', err.message);
