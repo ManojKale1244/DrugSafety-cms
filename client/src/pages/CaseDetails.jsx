@@ -29,6 +29,7 @@ import {
   FileCode,
 } from 'lucide-react';
 import api from '../services/api';
+import { formatErrorMessage } from '../utils/errorHelper';
 import DataOriginBadge from '../components/case/DataOriginBadge';
 import ChangeReasonModal from '../components/case/ChangeReasonModal';
 import ConflictModal from '../components/case/ConflictModal';
@@ -150,7 +151,7 @@ export default function CaseDetails() {
         // Handled gracefully
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load case record');
+      setError(formatErrorMessage(err, 'Failed to load case record'));
     } finally {
       setLoading(false);
     }
@@ -347,7 +348,9 @@ export default function CaseDetails() {
       <div className="card p-8 text-center max-w-lg mx-auto space-y-3">
         <AlertCircle className="mx-auto h-10 w-10 text-red-500" />
         <h2 className="text-base font-bold text-slate-900">Case Not Found</h2>
-        <p className="text-xs text-slate-500">{error}</p>
+        <p className="text-xs text-slate-500">
+          {typeof error === 'object' && error !== null ? error.message || JSON.stringify(error) : String(error || '')}
+        </p>
         <Link to="/cases" className="btn-secondary text-xs inline-flex items-center gap-1.5 mt-2">
           <ArrowLeft className="h-3.5 w-3.5" /> Return to Case Directory
         </Link>

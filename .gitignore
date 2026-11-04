@@ -9,6 +9,8 @@ node_modules/
 # Build output
 dist/
 build/
+uploads/
+server/uploads/
 
 # Logs
 logs/

@@ -14,6 +14,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import api from '../services/api';
+import { formatErrorMessage } from '../utils/errorHelper';
 import IntakeWizard from '../components/intake/IntakeWizard';
 
 const STATUS_FILTERS = [
@@ -63,7 +64,7 @@ export default function Intakes() {
         setTotalPages(res.data.pagination.totalPages);
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load case intakes');
+      setError(formatErrorMessage(err, 'Failed to load case intakes'));
     } finally {
       setLoading(false);
     }
@@ -204,7 +205,9 @@ export default function Intakes() {
           <div className="p-12 text-center">
             <AlertTriangle className="mx-auto h-12 w-12 text-amber-500" />
             <h3 className="mt-3 text-base font-semibold text-slate-800">Error loading intakes</h3>
-            <p className="mt-1 text-sm text-slate-500">{error}</p>
+            <p className="mt-1 text-sm text-slate-500">
+              {typeof error === 'object' && error !== null ? error.message || JSON.stringify(error) : String(error || '')}
+            </p>
             <button
               type="button"
               onClick={fetchIntakes}

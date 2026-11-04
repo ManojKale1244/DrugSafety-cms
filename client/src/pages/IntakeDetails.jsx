@@ -18,6 +18,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import api from '../services/api';
+import { formatErrorMessage } from '../utils/errorHelper';
 import { formatIntakeWhatsApp, openWhatsAppShare, WhatsAppIcon } from '../utils/whatsappFormatter';
 import CaseAttachmentsManager from '../components/case/CaseAttachmentsManager';
 
@@ -61,7 +62,7 @@ export default function IntakeDetails() {
         setIntake(res.data.intake);
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load intake report');
+      setError(formatErrorMessage(err, 'Failed to load intake report'));
     } finally {
       setLoading(false);
     }
@@ -150,7 +151,9 @@ export default function IntakeDetails() {
       <div className="card p-12 text-center max-w-lg mx-auto">
         <AlertTriangle className="mx-auto h-12 w-12 text-amber-500 mb-3" />
         <h3 className="text-lg font-bold text-slate-900">Intake Record Not Found</h3>
-        <p className="text-sm text-slate-500 mt-1">{error || 'Record does not exist'}</p>
+        <p className="text-sm text-slate-500 mt-1">
+          {typeof error === 'object' && error !== null ? error.message || JSON.stringify(error) : String(error || 'Record does not exist')}
+        </p>
         <Link to="/intakes" className="btn-primary mt-6 inline-flex">
           <ArrowLeft className="h-4 w-4" />
           Back to Intake Registry

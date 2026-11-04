@@ -20,6 +20,7 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import api from '../services/api';
+import { formatErrorMessage } from '../utils/errorHelper';
 import Can from '../components/auth/Can';
 import DataOriginBadge from '../components/case/DataOriginBadge';
 import { formatCasesListWhatsApp, openWhatsAppShare } from '../utils/whatsappFormatter';
@@ -117,7 +118,7 @@ export default function Cases() {
         setTotalCases(res.data.pagination.total);
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load safety cases');
+      setError(formatErrorMessage(err, 'Failed to load safety cases'));
     } finally {
       setLoading(false);
     }
@@ -622,7 +623,9 @@ export default function Cases() {
         ) : error ? (
           <div className="p-8 text-center text-red-600 space-y-2">
             <AlertTriangle className="mx-auto h-8 w-8 text-red-500" />
-            <p className="text-sm font-bold">{error}</p>
+            <p className="text-sm font-bold">
+              {typeof error === 'object' && error !== null ? error.message || JSON.stringify(error) : String(error || '')}
+            </p>
             <button
               type="button"
               onClick={fetchCases}

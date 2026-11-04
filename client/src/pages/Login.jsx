@@ -19,6 +19,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import { formatErrorMessage } from '../utils/errorHelper';
 
 const DEMO_ACCOUNTS = [
   { role: 'Admin', email: 'admin@drugsafety.local', pass: 'Admin@123456', desc: 'Full System Admin' },
@@ -71,7 +72,7 @@ export default function Login() {
       navigate(from, { replace: true });
     } catch (err) {
       const data = err.response?.data;
-      setErrorMessage(data?.error || 'Authentication failed. Please verify credentials.');
+      setErrorMessage(formatErrorMessage(err, 'Authentication failed. Please verify credentials.'));
       if (data?.isLocked) {
         setIsLocked(true);
       }
@@ -124,7 +125,7 @@ export default function Login() {
         setPassword(newPassword);
       }, 2000);
     } catch (err) {
-      setResetError(err.response?.data?.error || 'Failed to reset password');
+      setResetError(formatErrorMessage(err, 'Failed to reset password'));
     } finally {
       setResetLoading(false);
     }
@@ -265,7 +266,11 @@ export default function Login() {
                   <AlertCircle className={`h-5 w-5 shrink-0 mt-0.5 ${isLocked ? 'text-red-600' : 'text-amber-600'}`} />
                   <div>
                     <h4 className="font-semibold">{isLocked ? 'Account Temporarily Locked' : 'Authentication Error'}</h4>
-                    <p className="mt-0.5 text-xs leading-relaxed">{errorMessage}</p>
+                    <p className="mt-0.5 text-xs leading-relaxed">
+                      {typeof errorMessage === 'object' && errorMessage !== null
+                        ? errorMessage.message || JSON.stringify(errorMessage)
+                        : String(errorMessage || '')}
+                    </p>
                   </div>
                 </div>
               </motion.div>
@@ -498,14 +503,22 @@ export default function Login() {
               {resetError && (
                 <div className="mb-4 rounded-xl bg-red-50 p-3 border border-red-200 text-xs text-red-800 flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>{resetError}</span>
+                  <span>
+                    {typeof resetError === 'object' && resetError !== null
+                      ? resetError.message || JSON.stringify(resetError)
+                      : String(resetError || '')}
+                  </span>
                 </div>
               )}
 
               {resetSuccess && (
                 <div className="mb-4 rounded-xl bg-emerald-50 p-3 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 shrink-0" />
-                  <span>{resetSuccess}</span>
+                  <span>
+                    {typeof resetSuccess === 'object' && resetSuccess !== null
+                      ? resetSuccess.message || JSON.stringify(resetSuccess)
+                      : String(resetSuccess || '')}
+                  </span>
                 </div>
               )}
 

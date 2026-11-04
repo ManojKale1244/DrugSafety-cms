@@ -2,7 +2,9 @@ import mongoose from 'mongoose';
 import app from '../server/src/app.js';
 import { config } from '../server/src/config/index.js';
 import { Role } from '../server/src/models/Role.js';
+import { Term } from '../server/src/models/Term.js';
 import { seedDatabase } from '../server/src/seeds/seed.js';
+import { seedSyntheticTerminology } from '../server/src/seeds/syntheticTerminology.js';
 
 let isConnected = false;
 
@@ -28,6 +30,11 @@ async function connectToDatabase() {
     const roleCount = await Role.countDocuments();
     if (roleCount === 0) {
       await seedDatabase();
+    } else {
+      const termCount = await Term.countDocuments();
+      if (termCount === 0) {
+        await seedSyntheticTerminology();
+      }
     }
   } catch (seedErr) {
     console.warn('Auto-seed check notice:', seedErr.message);

@@ -11,6 +11,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import api from '../services/api';
+import { formatErrorMessage } from '../utils/errorHelper';
 import { useAuth } from '../context/AuthContext';
 import KpiCard from '../components/dashboard/KpiCard';
 import StatusDonutChart from '../components/dashboard/StatusDonutChart';
@@ -48,7 +49,7 @@ export default function Dashboard() {
         setData(res.data);
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to retrieve dashboard metrics');
+      setError(formatErrorMessage(err, 'Failed to retrieve dashboard metrics'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -181,7 +182,9 @@ export default function Dashboard() {
             <AlertTriangle className="h-6 w-6 text-red-600 shrink-0" />
             <div>
               <h3 className="font-bold text-sm">Failed to Load Dashboard Metrics</h3>
-              <p className="text-xs text-red-700 mt-0.5">{error}</p>
+              <p className="text-xs text-red-700 mt-0.5">
+                {typeof error === 'object' && error !== null ? error.message || JSON.stringify(error) : String(error || '')}
+              </p>
             </div>
           </div>
           <button
