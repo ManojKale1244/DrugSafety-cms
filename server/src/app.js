@@ -10,7 +10,9 @@ import { config } from './config/index.js';
 import { mountRoutes } from './routes/index.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { Role } from './models/Role.js';
+import { Term } from './models/Term.js';
 import { seedDatabase } from './seeds/seed.js';
+import { seedSyntheticTerminology } from './seeds/syntheticTerminology.js';
 import { logger } from './utils/logger.js';
 
 const app = express();
@@ -112,6 +114,11 @@ async function ensureDatabaseConnected() {
       const roleCount = await Role.countDocuments();
       if (roleCount === 0) {
         await seedDatabase();
+      } else {
+        const termCount = await Term.countDocuments();
+        if (termCount === 0) {
+          await seedSyntheticTerminology();
+        }
       }
     } catch (seedErr) {
       logger.warn({ seedErr }, 'Auto-seed check notice');

@@ -26,6 +26,7 @@ export async function recordAudit({
 }) {
   try {
     const finalEntity = entity || entityType || 'System';
+    const effectiveActor = actor || null;
     const finalDetails = meta && Object.keys(details).length === 0 ? meta : details;
 
     const ip = req
@@ -34,13 +35,13 @@ export async function recordAudit({
     const userAgent = req?.headers['user-agent'] || 'unknown';
 
     await AuditEvent.create({
-      actorId: actor?._id || actor?.id || null,
-      actorEmail: actor?.email || 'system',
-      actorRole: actor?.role?.name || actor?.roleName || 'system',
+      actorId: effectiveActor?._id || effectiveActor?.id || null,
+      actorEmail: effectiveActor?.email || 'system',
+      actorRole: effectiveActor?.role?.name || effectiveActor?.roleName || 'system',
       action,
       entity: finalEntity,
       entityId: entityId ? String(entityId) : null,
-      summary,
+      summary: summary || `${action} on ${finalEntity}${entityId ? ` (${entityId})` : ''}`,
       details: finalDetails,
       ip,
       userAgent,
@@ -51,3 +52,35 @@ export async function recordAudit({
     logger.error({ err: error, action, entity }, 'Failed to write AuditEvent');
   }
 }
+
+/**
+ * Audit trail helper function for 21 CFR Part 11 compliance.
+ */
+export async function auditTrail({
+  user = null,
+  actor = null,
+  action,
+  entity,
+  entityType,
+  entityId = null,
+  summary,
+  details = {},
+  meta = null,
+  req = null,
+}) {
+  return recordAudit({
+    actor: actor || user,
+    action,
+    entity: entity || entityType,
+    entityId,
+    summary,
+    details,
+    meta,
+    req,
+  });
+}
+
+export default {
+  recordAudit,
+  auditTrail,
+};

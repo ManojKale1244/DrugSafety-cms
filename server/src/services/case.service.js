@@ -181,8 +181,9 @@ export async function getCaseById(idOrNumber) {
 export async function createCase(data, user) {
   const caseNumber = data.caseNumber || (await generateCaseNumber());
 
-  // Default receiptDate validation: cannot be in future
-  if (data.receiptDate && new Date(data.receiptDate) > new Date()) {
+  // Default receiptDate validation: cannot be in future (allow timezone buffer)
+  const maxAllowed = new Date().setHours(23, 59, 59, 999) + 24 * 60 * 60 * 1000;
+  if (data.receiptDate && new Date(data.receiptDate).getTime() > maxAllowed) {
     throw new ValidationError('Receipt date cannot be in the future.');
   }
 
@@ -327,7 +328,35 @@ export async function updateCase(idOrNumber, updateData, user) {
     );
   }
 
-  // 4. Calculate Field-Level Diffs
+  // 4. Workflow Advancement Gate: Cannot advance workflow past coding while reactions are uncoded
+  const postCodingStatuses = [
+    'medical_review',
+    'quality_review',
+    'ready_for_submission',
+    'submitted',
+    'completed',
+    'closed',
+  ];
+  if (
+    updateData.status &&
+    updateData.status !== caseDoc.status &&
+    postCodingStatuses.includes(updateData.status)
+  ) {
+    const effectiveReactions =
+      updateData.reactions !== undefined ? updateData.reactions : caseDoc.reactions || [];
+    if (effectiveReactions.length > 0) {
+      const uncodedReactions = effectiveReactions.filter(
+        (r) => !r.pt || !r.pt.trim() || !r.meddraCode || !String(r.meddraCode).trim(),
+      );
+      if (uncodedReactions.length > 0) {
+        throw new ValidationError(
+          `Cannot advance workflow to "${updateData.status}" while reactions remain uncoded. ${uncodedReactions.length} reaction(s) must be coded with MedDRA terms first.`,
+        );
+      }
+    }
+  }
+
+  // 5. Calculate Field-Level Diffs
   const diffs = calculateFieldDiffs(caseDoc.toObject(), updateData);
 
   // 5. Apply Updates
@@ -472,6 +501,17 @@ export function validateCaseClosureReadiness(caseDoc) {
   const assessment = caseDoc.assessment || {};
   if (!assessment.companyCausality || assessment.companyCausality === 'Unassessed') {
     missingRequirements.push('Company Causality Assessment (Medical Review)');
+  }
+
+  // 6. MedDRA Medical Coding for all adverse reactions
+  const reactions = caseDoc.reactions || [];
+  if (reactions.length > 0) {
+    const uncoded = reactions.filter(
+      (r) => !r.pt || !r.pt.trim() || !r.meddraCode || !String(r.meddraCode).trim(),
+    );
+    if (uncoded.length > 0) {
+      missingRequirements.push(`${uncoded.length} adverse reaction(s) require MedDRA medical coding`);
+    }
   }
 
   return {

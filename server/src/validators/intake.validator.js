@@ -5,9 +5,16 @@ export const createIntakeSchema = z.object({
   receiptDate: z
     .string({ required_error: 'Receipt date is required' })
     .refine((val) => !isNaN(Date.parse(val)), { message: 'Invalid receipt date format' })
-    .refine((val) => new Date(val).getTime() <= Date.now(), {
-      message: 'Receipt date cannot be set in the future',
-    }),
+    .refine(
+      (val) => {
+        const endOfToday = new Date();
+        endOfToday.setHours(23, 59, 59, 999);
+        return new Date(val).getTime() <= endOfToday.getTime() + 24 * 60 * 60 * 1000;
+      },
+      {
+        message: 'Receipt date cannot be set in the future',
+      },
+    ),
   reporter: z
     .object({
       name: z.string().trim().optional().default(''),
@@ -54,9 +61,16 @@ export const updateIntakeSchema = z.object({
   receiptDate: z
     .string()
     .refine((val) => !isNaN(Date.parse(val)), { message: 'Invalid receipt date format' })
-    .refine((val) => new Date(val).getTime() <= Date.now(), {
-      message: 'Receipt date cannot be set in the future',
-    })
+    .refine(
+      (val) => {
+        const endOfToday = new Date();
+        endOfToday.setHours(23, 59, 59, 999);
+        return new Date(val).getTime() <= endOfToday.getTime() + 24 * 60 * 60 * 1000;
+      },
+      {
+        message: 'Receipt date cannot be set in the future',
+      },
+    )
     .optional(),
   reporter: z
     .object({

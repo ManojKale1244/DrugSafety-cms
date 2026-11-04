@@ -1,6 +1,7 @@
 import { Intake } from '../models/Intake.js';
 import { Case } from '../models/Case.js';
 import { recordAudit } from '../utils/audit.js';
+import { transferIntakeAttachmentsToCase } from './attachment.service.js';
 
 /**
  * Validates the 4 ICH E2D Minimum Criteria for a valid Adverse Event Report:
@@ -183,9 +184,10 @@ export async function generateCaseNumber() {
  * Create a new Intake record.
  */
 export async function createIntake(payload, user, req) {
-  // Validate receiptDate not in future
+  // Validate receiptDate not in future (allow up to end of calendar day with timezone buffer)
   const receiptDate = new Date(payload.receiptDate || Date.now());
-  if (receiptDate.getTime() > Date.now()) {
+  const maxAllowed = new Date().setHours(23, 59, 59, 999) + 24 * 60 * 60 * 1000;
+  if (receiptDate.getTime() > maxAllowed) {
     return {
       success: false,
       statusCode: 400,
@@ -320,7 +322,8 @@ export async function updateIntake(id, updateData, user, req) {
 
   if (updateData.receiptDate) {
     const d = new Date(updateData.receiptDate);
-    if (d.getTime() > Date.now()) {
+    const maxAllowed = new Date().setHours(23, 59, 59, 999) + 24 * 60 * 60 * 1000;
+    if (d.getTime() > maxAllowed) {
       return { success: false, statusCode: 400, error: 'Receipt date cannot be in the future' };
     }
     intake.receiptDate = d;
@@ -434,6 +437,13 @@ export async function convertIntakeToCase(id, user, req) {
   intake.convertedCaseId = newCase._id;
   intake.convertedCaseNumber = newCase.caseNumber;
   await intake.save();
+
+  // Seamlessly transfer any intake source documents / attachments to the formal case
+  try {
+    await transferIntakeAttachmentsToCase(intake._id, newCase._id, newCase.caseNumber);
+  } catch (transferErr) {
+    console.error('Failed to transfer intake attachments to case:', transferErr);
+  }
 
   // Log linked audit trail
   await recordAudit({

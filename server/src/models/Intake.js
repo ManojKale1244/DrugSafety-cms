@@ -21,7 +21,8 @@ const intakeSchema = new mongoose.Schema(
       required: true,
       validate: {
         validator: function (value) {
-          return value <= new Date();
+          const maxAllowed = new Date().setHours(23, 59, 59, 999) + 24 * 60 * 60 * 1000;
+          return value.getTime() <= maxAllowed;
         },
         message: 'Receipt date cannot be in the future',
       },

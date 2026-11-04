@@ -18,10 +18,13 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.1",
     "express-rate-limit": "^7.4.1",
+    "fast-xml-parser": "^5.11.2",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.8.0",
     "morgan": "^1.10.0",
+    "multer": "^2.5.0",
+    "pdfkit": "^0.20.2",
     "pino": "^9.5.0",
     "zod": "^3.23.8"
   },

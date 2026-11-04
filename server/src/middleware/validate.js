@@ -18,9 +18,10 @@ export function validate(schema, target = 'body') {
           field: err.path.join('.'),
           message: err.message,
         }));
+        const detailedMessage = issues.map((i) => i.message).join(', ');
         return res.status(400).json({
           success: false,
-          error: 'Validation failed',
+          error: detailedMessage || 'Validation failed',
           issues,
         });
       }

@@ -8,6 +8,9 @@ import { Case } from '../models/Case.js';
 import { ActionItem } from '../models/ActionItem.js';
 import { AuditEvent } from '../models/AuditEvent.js';
 import { Intake } from '../models/Intake.js';
+import { DuplicateReview } from '../models/DuplicateReview.js';
+import { scoreCasePair } from '../services/duplicate.service.js';
+import { seedSyntheticTerminology } from './syntheticTerminology.js';
 
 export const SEEDED_ROLES = [
   {
@@ -42,6 +45,7 @@ export const SEEDED_ROLES = [
     permissions: [
       'case.read',
       'case.update',
+      'medical.review',
       'contact_log.create',
       'contact_log.read',
       'action_item.read',
@@ -395,6 +399,105 @@ async function seedCasesAndWorkload() {
       patientAge: 31,
       patientGender: 'Female',
     },
+    {
+      caseNumber: 'CASE-1013',
+      reportType: 'Spontaneous',
+      product: 'Medicine A',
+      eventSummary: 'Generalized urticaria and pruritic skin rash following 3rd dosage',
+      seriousness: 'Non-Serious',
+      status: 'new',
+      assignedTo: managerUser?._id,
+      regulatoryDueDate: new Date(now + 13 * dayMs),
+      receivedDate: new Date(now - 1 * dayMs),
+      patientAge: 38,
+      patientGender: 'Female',
+      patient: {
+        reference: 'PT-0101-DUP',
+        age: 38,
+        ageUnit: 'years',
+        sex: 'Female',
+      },
+      reporter: {
+        name: 'Dr. Claire Manager',
+        qualification: 'Physician',
+        contact: 'claire@clinic.org',
+        country: 'India',
+      },
+      caseProducts: [{ productName: 'Medicine A', role: 'Suspect', dose: '500mg' }],
+      reactions: [
+        {
+          verbatim: 'Generalized urticaria and pruritic skin rash following 3rd dosage',
+          pt: 'Urticaria',
+          outcome: 'recovering',
+        },
+      ],
+    },
+    {
+      caseNumber: 'CASE-1014',
+      reportType: 'Clinical Trial',
+      product: 'CardioGuard',
+      eventSummary: 'Sinus Tachycardia with syncopal fainting episode requiring emergency monitoring',
+      seriousness: 'Serious',
+      status: 'new',
+      assignedTo: reviewerUser?._id,
+      regulatoryDueDate: new Date(now + 3 * dayMs),
+      receivedDate: new Date(now - 3 * dayMs),
+      patientAge: 54,
+      patientGender: 'Male',
+      patient: {
+        reference: 'PT-0102-DUP',
+        age: 54,
+        ageUnit: 'years',
+        sex: 'Male',
+      },
+      reporter: {
+        name: 'Dr. Robert Reviewer',
+        qualification: 'Physician',
+        contact: 'cardio-trial@hospital.org',
+        country: 'India',
+      },
+      caseProducts: [{ productName: 'CardioGuard', role: 'Suspect', dose: '25mg' }],
+      reactions: [
+        {
+          verbatim: 'Sinus Tachycardia with syncopal fainting episode',
+          pt: 'Tachycardia',
+          outcome: 'not_recovered',
+        },
+      ],
+    },
+    {
+      caseNumber: 'CASE-1015',
+      reportType: 'Spontaneous',
+      product: 'NeuroCalm',
+      eventSummary: 'Postural dizziness, mild vertigo, and unsteady gait',
+      seriousness: 'Non-Serious',
+      status: 'new',
+      assignedTo: dataEntryUser?._id,
+      regulatoryDueDate: new Date(now + 7 * dayMs),
+      receivedDate: new Date(now - 6 * dayMs),
+      patientAge: 30,
+      patientGender: 'Female',
+      patient: {
+        reference: 'PT-0103-DUP',
+        age: 30,
+        ageUnit: 'years',
+        sex: 'Female',
+      },
+      reporter: {
+        name: 'City Health Pharmacy',
+        qualification: 'Pharmacist',
+        contact: 'rx@cityhealth.in',
+        country: 'India',
+      },
+      caseProducts: [{ productName: 'NeuroCalm', role: 'Suspect', dose: '10mg' }],
+      reactions: [
+        {
+          verbatim: 'Postural dizziness, mild vertigo, and unsteady gait',
+          pt: 'Dizziness',
+          outcome: 'recovered',
+        },
+      ],
+    },
   ];
 
   const caseMap = new Map();
@@ -408,6 +511,40 @@ async function seedCasesAndWorkload() {
   }
 
   logger.info(`✓ Seeded ${demoCases.length} adverse event cases`);
+
+  // ── Seed Ranked Near-Duplicates for Queue ───────────────────
+  const duplicatePairs = [
+    { sourceNum: 'CASE-1013', candNum: 'CASE-1001' },
+    { sourceNum: 'CASE-1014', candNum: 'CASE-1002' },
+    { sourceNum: 'CASE-1015', candNum: 'CASE-1003' },
+  ];
+
+  for (const pair of duplicatePairs) {
+    const sourceCase = caseMap.get(pair.sourceNum);
+    const candCase = caseMap.get(pair.candNum);
+
+    if (sourceCase && candCase) {
+      const scoring = scoreCasePair(sourceCase, candCase);
+      await DuplicateReview.findOneAndUpdate(
+        { sourceId: sourceCase._id, candidateCaseId: candCase._id },
+        {
+          $set: {
+            sourceId: sourceCase._id,
+            candidateCaseId: candCase._id,
+            sourceCaseNumber: sourceCase.caseNumber,
+            candidateCaseNumber: candCase.caseNumber,
+            score: scoring.score,
+            matchedFields: scoring.matchedFields,
+            breakdown: scoring.breakdown,
+            decision: 'PENDING',
+          },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      );
+    }
+  }
+
+  logger.info(`✓ Seeded ${duplicatePairs.length} ranked near-duplicate candidate reviews`);
 
   // ── Action Items ──────────────────────────────────────────
   const demoActions = [
@@ -700,6 +837,9 @@ async function seedCasesAndWorkload() {
   }
 
   logger.info(`✓ Seeded ${demoIntakes.length} demo intake records`);
+
+  // Seed Synthetic Medical Terminology (Module 6)
+  await seedSyntheticTerminology();
 }
 
 // Allow direct execution: `node src/seeds/seed.js`

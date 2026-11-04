@@ -2,16 +2,34 @@ import mongoose from 'mongoose';
 
 const productSchema = new mongoose.Schema(
   {
+    productId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+      default: null,
+    },
     productName: { type: String, required: true, trim: true },
+    genericName: { type: String, default: '', trim: true },
     role: {
       type: String,
-      enum: ['Suspect', 'Concomitant', 'Interacting'],
+      enum: ['Suspect', 'Concomitant', 'Interacting', 'SUSPECT', 'CONCOMITANT', 'INTERACTING'],
       default: 'Suspect',
     },
     dose: { type: String, default: '' },
     frequency: { type: String, default: '' },
     route: { type: String, default: '' },
     indication: { type: String, default: '' },
+    actionTaken: {
+      type: String,
+      enum: [
+        'DRUG_WITHDRAWN',
+        'DOSE_REDUCED',
+        'DOSE_INCREASED',
+        'DOSE_NOT_CHANGED',
+        'NOT_APPLICABLE',
+        'UNKNOWN',
+      ],
+      default: 'UNKNOWN',
+    },
     startDate: { type: Date, default: null },
     stopDate: { type: Date, default: null },
     lotNumber: { type: String, default: '' },
@@ -64,6 +82,14 @@ const caseSchema = new mongoose.Schema(
         'submitted',
         'completed',
         'closed',
+        'NEW',
+        'DATA_ENTRY',
+        'MEDICAL_CODING',
+        'MEDICAL_REVIEW',
+        'QUALITY_REVIEW',
+        'REGULATORY_REPORTING',
+        'FINAL_REVIEW',
+        'CLOSED',
       ],
       default: 'new',
       index: true,
@@ -196,6 +222,20 @@ const caseSchema = new mongoose.Schema(
       qualityReviewCompleted: { type: Boolean, default: false },
     },
 
+    // ── Source Documents & Attachments Flag ─────────────────
+    attachmentsFlag: {
+      type: Boolean,
+      default: false,
+    },
+    attachments: [
+      {
+        name: { type: String, required: true },
+        url: { type: String, default: '' },
+        category: { type: String, default: 'Source Document' },
+        uploadedAt: { type: Date, default: Date.now },
+      },
+    ],
+
     // ── Optimistic Concurrency Control ──────────────────────
     version: {
       type: Number,
@@ -212,6 +252,39 @@ const caseSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+
+    // ── Linked Cases & Duplicate Relations ──────────────────
+    linkedCases: [
+      {
+        caseId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Case',
+          required: true,
+        },
+        caseNumber: {
+          type: String,
+          required: true,
+        },
+        linkType: {
+          type: String,
+          enum: ['CONFIRMED_DUPLICATE', 'MASTER', 'CHILD', 'RELATED'],
+          default: 'CONFIRMED_DUPLICATE',
+        },
+        linkedAt: {
+          type: Date,
+          default: Date.now,
+        },
+        linkedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          default: null,
+        },
+        reason: {
+          type: String,
+          default: '',
+        },
+      },
+    ],
 
     // ── Legacy Compatibility Fields ─────────────────────────
     product: {
@@ -245,6 +318,15 @@ const caseSchema = new mongoose.Schema(
 
 // Synchronize legacy summary fields before saving
 caseSchema.pre('save', function (next) {
+  // Validate product dates: stopDate >= startDate
+  if (this.caseProducts && this.caseProducts.length > 0) {
+    for (const p of this.caseProducts) {
+      if (p.startDate && p.stopDate && new Date(p.stopDate) < new Date(p.startDate)) {
+        return next(new Error(`Product "${p.productName}": Stop date cannot be earlier than start date.`));
+      }
+    }
+  }
+
   // Sync products
   if (this.caseProducts && this.caseProducts.length > 0) {
     const suspect = this.caseProducts.find((p) => p.role === 'Suspect') || this.caseProducts[0];
