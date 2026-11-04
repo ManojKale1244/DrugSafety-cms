@@ -12,30 +12,6 @@
   },
   "rewrites": [
     {
-      "source": "/assets/(.*)",
-      "destination": {
-        "service": "client"
-      }
-    },
-    {
-      "source": "/favicon.svg",
-      "destination": {
-        "service": "client"
-      }
-    },
-    {
-      "source": "/favicon.ico",
-      "destination": {
-        "service": "client"
-      }
-    },
-    {
-      "source": "/robots.txt",
-      "destination": {
-        "service": "client"
-      }
-    },
-    {
       "source": "/(.*)",
       "destination": {
         "service": "server"

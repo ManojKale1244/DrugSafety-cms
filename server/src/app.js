@@ -136,6 +136,19 @@ async function ensureDatabaseConnected() {
   }
 }
 
+// ── Serve Frontend Static Assets (Scripts, CSS, Favicons) ───
+const assetsDir = path.resolve(__dirname, 'assets');
+if (fs.existsSync(assetsDir)) {
+  app.use('/assets', express.static(assetsDir, { maxAge: '1y', immutable: true }));
+}
+app.get('/favicon.svg', (req, res) => {
+  const favPath = path.resolve(__dirname, 'favicon.svg');
+  if (fs.existsSync(favPath)) {
+    return res.sendFile(favPath);
+  }
+  return res.status(204).end();
+});
+
 // ── SPA Fallback for Direct Navigation / Page Reload ──────────
 // When a browser requests a page URL (e.g. /dashboard, /intakes, /login, /cases/123),
 // immediately serve the React SPA index.html with HTTP 200 without waiting for database operations.

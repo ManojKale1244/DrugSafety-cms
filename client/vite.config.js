@@ -14,9 +14,16 @@ function copy404Plugin() {
       try {
         if (fs.existsSync(idx)) {
           fs.copyFileSync(idx, fallback);
-          const serverIndex = path.resolve(__dirname, '../server/src/index.html');
+          const serverSrc = path.resolve(__dirname, '../server/src');
+          const serverIndex = path.join(serverSrc, 'index.html');
           fs.copyFileSync(idx, serverIndex);
-          console.log('✓ SPA Fallback: Generated dist/404.html and server/src/index.html');
+
+          const assetsDist = path.join(dist, 'assets');
+          const serverAssets = path.join(serverSrc, 'assets');
+          if (fs.existsSync(assetsDist)) {
+            fs.cpSync(assetsDist, serverAssets, { recursive: true });
+          }
+          console.log('✓ SPA Fallback: Generated dist/404.html, server/src/index.html, and synced server/src/assets');
         }
       } catch (err) {
         console.warn('Notice: Could not copy 404.html:', err.message);
