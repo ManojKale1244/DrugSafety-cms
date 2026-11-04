@@ -18,9 +18,28 @@
       }
     },
     {
-      "source": "/(.*)",
+      "source": "/health",
+      "destination": {
+        "service": "server"
+      }
+    },
+    {
+      "source": "/assets/(.*)",
       "destination": {
         "service": "client"
+      }
+    },
+    {
+      "source": "/(.*\\.(?:ico|png|svg|jpg|jpeg|gif|webp|json|js|css|woff|woff2|ttf|map|txt))",
+      "destination": {
+        "service": "client"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "client",
+        "path": "/index.html"
       }
     }
   ]
