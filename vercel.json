@@ -30,7 +30,19 @@
       }
     },
     {
-      "source": "/(.*\\.(?:ico|png|svg|jpg|jpeg|gif|webp|json|js|css|woff|woff2|ttf|map|txt))",
+      "source": "/favicon.svg",
+      "destination": {
+        "service": "client"
+      }
+    },
+    {
+      "source": "/favicon.ico",
+      "destination": {
+        "service": "client"
+      }
+    },
+    {
+      "source": "/robots.txt",
       "destination": {
         "service": "client"
       }
