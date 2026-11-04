@@ -14,43 +14,50 @@
     {
       "source": "/api/(.*)",
       "destination": {
-        "service": "server"
+        "service": "server",
+        "path": "/api/$1"
       }
     },
     {
       "source": "/health",
       "destination": {
-        "service": "server"
+        "service": "server",
+        "path": "/health"
       }
     },
     {
       "source": "/assets/(.*)",
       "destination": {
-        "service": "client"
+        "service": "client",
+        "path": "/assets/$1"
       }
     },
     {
       "source": "/favicon.svg",
       "destination": {
-        "service": "client"
+        "service": "client",
+        "path": "/favicon.svg"
       }
     },
     {
       "source": "/favicon.ico",
       "destination": {
-        "service": "client"
+        "service": "client",
+        "path": "/favicon.ico"
       }
     },
     {
       "source": "/robots.txt",
       "destination": {
-        "service": "client"
+        "service": "client",
+        "path": "/robots.txt"
       }
     },
     {
       "source": "/(.*)",
       "destination": {
-        "service": "client"
+        "service": "client",
+        "path": "/index.html"
       }
     }
   ]
