@@ -2,11 +2,11 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "services": {
     "client": {
-      "root": "client",
+      "root": "client/",
       "framework": "vite"
     },
     "server": {
-      "root": "server",
+      "root": "server/",
       "framework": "express"
     }
   },
@@ -14,50 +14,19 @@
     {
       "source": "/api/(.*)",
       "destination": {
-        "service": "server",
-        "path": "/api/$1"
+        "service": "server"
       }
     },
     {
       "source": "/health",
       "destination": {
-        "service": "server",
-        "path": "/health"
-      }
-    },
-    {
-      "source": "/assets/(.*)",
-      "destination": {
-        "service": "client",
-        "path": "/assets/$1"
-      }
-    },
-    {
-      "source": "/favicon.svg",
-      "destination": {
-        "service": "client",
-        "path": "/favicon.svg"
-      }
-    },
-    {
-      "source": "/favicon.ico",
-      "destination": {
-        "service": "client",
-        "path": "/favicon.ico"
-      }
-    },
-    {
-      "source": "/robots.txt",
-      "destination": {
-        "service": "client",
-        "path": "/robots.txt"
+        "service": "server"
       }
     },
     {
       "source": "/(.*)",
       "destination": {
-        "service": "client",
-        "path": "/index.html"
+        "service": "client"
       }
     }
   ]
