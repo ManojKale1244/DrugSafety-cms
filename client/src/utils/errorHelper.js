@@ -50,3 +50,4 @@ export function formatErrorMessage(err, fallback = 'An unexpected error occurred
 
   return fallback;
 }
+
